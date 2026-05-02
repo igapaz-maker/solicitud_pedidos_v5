@@ -1,0 +1,1476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Pedidos">
+    <meta name="theme-color" content="#0f1f3d">
+    <title>Solicitud de Pedidos v5</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap');
+        :root {
+            --navy:#0f1f3d; --navy2:#1a3160; --blue:#2563eb;
+            --teal:#0d9488; --teal2:#14b8a6;
+            --amber:#f59e0b; --red:#ef4444; --green:#10b981;
+            --purple:#7c3aed;
+            --bg:#f0f4f8; --card:#ffffff; --border:#dde3ee;
+            --text:#1e293b; --muted:#64748b;
+        }
+        *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+        html{font-size:15px;}
+        body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;padding-bottom:100px;}
+        .header{background:linear-gradient(135deg,var(--navy),var(--navy2));padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(15,31,61,.35);}
+        .header-left{display:flex;align-items:center;gap:10px;}
+        .h-icon{font-size:22px;}
+        .h-title{color:#fff;font-size:1.05rem;font-weight:800;}
+        .h-title span{color:var(--teal2);}
+        .h-sub{color:#94a3b8;font-size:0.68rem;margin-top:1px;}
+        .rol-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.62rem;font-weight:700;letter-spacing:.4px;margin-left:6px;}
+        .rol-sol{background:#dbeafe;color:#1e40af;}
+        .rol-aut{background:#fef3c7;color:#92400e;}
+        .rol-bod{background:#d1fae5;color:#065f46;}
+        .folio-badge{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:6px 12px;text-align:center;}
+        .folio-badge .fl{color:#fff;font-family:'JetBrains Mono',monospace;font-size:1.05rem;font-weight:600;display:block;}
+        .folio-badge .flab{color:#94a3b8;font-size:0.62rem;letter-spacing:.8px;}
+        .folio-badge .fhint{color:#94a3b8;font-size:0.58rem;display:block;margin-top:1px;}
+        .tabs{display:flex;background:var(--card);border-bottom:1px solid var(--border);overflow-x:auto;scrollbar-width:none;position:sticky;top:69px;z-index:90;}
+        .tabs::-webkit-scrollbar{display:none;}
+        .tab{flex:1;min-width:0;padding:10px 2px;text-align:center;font-size:0.68rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:.2s;user-select:none;}
+        .tab.active{color:var(--blue);border-bottom-color:var(--blue);}
+        .page{display:none;padding:14px;}
+        .page.active{display:block;}
+        .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px;}
+        .card-title{font-size:0.85rem;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:7px;}
+        .badge{background:var(--navy);color:#fff;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;flex-shrink:0;}
+        .field{margin-bottom:11px;}
+        .field label{display:block;font-size:0.7rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;}
+        .field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:0.88rem;font-family:'Outfit',sans-serif;color:var(--text);background:#f8fafc;}
+        .field textarea{resize:vertical;font-family:'JetBrains Mono',monospace;font-size:0.74rem;line-height:1.4;}
+        .field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(37,99,235,.1);}
+        .field input:disabled{background:#f1f5f9;color:#94a3b8;}
+        .hint{font-size:0.68rem;color:var(--muted);margin-top:3px;line-height:1.4;}
+        .btn{padding:11px 16px;border:none;border-radius:8px;font-family:'Outfit',sans-serif;font-size:0.84rem;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:.15s;white-space:nowrap;justify-content:center;}
+        .btn-primary{background:var(--blue);color:#fff;width:100%;}
+        .btn-primary:disabled{background:#93c5fd;cursor:not-allowed;}
+        .btn-danger{background:var(--red);color:#fff;padding:7px 10px;font-size:0.78rem;border-radius:6px;}
+        .btn-success{background:var(--green);color:#fff;}
+        .btn-excel{background:#166534;color:#fff;}
+        .btn-email{background:var(--purple);color:#fff;}
+        .btn-email:disabled{background:#a78bfa;cursor:not-allowed;}
+        .btn-amber{background:var(--amber);color:#fff;}
+        .btn-outline{background:transparent;color:var(--muted);border:1.5px solid var(--border);}
+        .btn-teal{background:var(--teal);color:#fff;}
+        .btn-full{width:100%;}
+        .btn-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;}
+        .btn-single{margin-bottom:8px;}
+        .search-row{display:flex;gap:10px;align-items:flex-end;}
+        .search-row .field:first-child{flex:1;margin-bottom:0;}
+        .search-row .field.qty{width:80px;flex-shrink:0;margin-bottom:0;}
+        .search-row .btn{flex-shrink:0;padding:10px 14px;width:auto;}
+        .table-scroll{overflow-x:auto;border-radius:8px;border:1px solid var(--border);margin-top:8px;}
+        table{width:100%;border-collapse:collapse;font-size:0.78rem;min-width:460px;}
+        thead tr{background:var(--navy);}
+        th{color:#e2e8f0;font-weight:600;padding:9px 8px;text-align:center;font-size:0.68rem;text-transform:uppercase;letter-spacing:.3px;}
+        td{padding:9px 8px;border-bottom:1px solid #f1f5f9;text-align:center;}
+        tbody tr:last-child td{border-bottom:none;}
+        td.td-name{text-align:left;font-weight:500;}
+        .empty-row td{text-align:center;color:var(--muted);padding:28px;font-size:0.82rem;}
+        input.qty-real,input.qty-edit{width:66px;padding:5px 6px;border:1.5px solid var(--border);border-radius:6px;font-size:0.78rem;text-align:center;font-family:'Outfit',sans-serif;}
+        input.qty-edit.modificado{background:#fef3c7;border-color:var(--amber);color:#92400e;font-weight:700;}
+        .total-bar{background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:12px 16px;display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:10px;}
+        .total-label{font-size:0.8rem;color:#166534;font-weight:600;}
+        .total-val{font-family:'JetBrains Mono',monospace;font-size:1.2rem;font-weight:700;color:#15803d;}
+        .pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:0.74rem;font-weight:600;}
+        .pill-warn{background:#fef3c7;color:#92400e;}
+        .pill-ok{background:#d1fae5;color:#065f46;}
+        .pill-err{background:#fee2e2;color:#991b1b;}
+        .pill-purple{background:#ede9fe;color:#5b21b6;}
+        .pill-blue{background:#dbeafe;color:#1e40af;}
+        .db-panel{background:linear-gradient(135deg,#eff6ff,#f0fdf4);border:1px solid #bfdbfe;border-radius:12px;padding:14px 16px;margin-bottom:14px;}
+        .db-stats{display:flex;gap:8px;margin-top:10px;}
+        .db-stat{background:#fff;border:1px solid var(--border);border-radius:7px;padding:5px 12px;text-align:center;}
+        .db-stat .sv{font-family:'JetBrains Mono',monospace;font-size:1.1rem;font-weight:700;color:var(--navy);}
+        .db-stat .sl{font-size:0.65rem;color:var(--muted);text-transform:uppercase;}
+        .acum-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px;}
+        .acum-stat-card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center;}
+        .acum-stat-card .av{font-family:'JetBrains Mono',monospace;font-size:1.3rem;font-weight:700;color:var(--navy);}
+        .acum-stat-card .al{font-size:0.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
+        .step-guide{counter-reset:steps;padding:0;}
+        .step-guide li{counter-increment:steps;list-style:none;padding:8px 0 8px 30px;position:relative;font-size:0.78rem;color:var(--muted);border-bottom:1px solid #f1f5f9;line-height:1.55;}
+        .step-guide li:last-child{border-bottom:none;}
+        .step-guide li::before{content:counter(steps);position:absolute;left:0;top:10px;background:var(--navy);color:#fff;width:18px;height:18px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.65rem;font-weight:700;}
+        .step-guide li strong{color:var(--text);}
+        .step-guide li code{background:#e2e8f0;padding:1px 5px;border-radius:4px;font-size:0.76rem;font-family:monospace;}
+        .sending-toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 24px;border-radius:30px;font-size:0.82rem;font-weight:600;z-index:999;display:none;align-items:center;gap:8px;box-shadow:0 4px 20px rgba(0,0,0,.3);}
+        .sending-toast.show{display:flex;}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        .spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0;}
+        .ver-banner{background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:10px;}
+        .ver-banner.hidden{display:none;}
+        .ver-btn{background:var(--amber);color:#fff;border:none;border-radius:6px;padding:6px 12px;font-size:0.76rem;font-weight:600;font-family:'Outfit',sans-serif;cursor:pointer;}
+        #dbMiniStatus{margin-bottom:10px;}
+        a.lnk{color:var(--blue);font-size:0.78rem;}
+        .estado-pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.3px;}
+        .est-pend{background:#fef3c7;color:#92400e;}
+        .est-aprob{background:#d1fae5;color:#065f46;}
+        .est-rech{background:#fee2e2;color:#991b1b;}
+        .flow-diagram{background:linear-gradient(135deg,#eff6ff,#f5f3ff);border:1px solid #c7d2fe;border-radius:10px;padding:12px;margin-bottom:14px;}
+        .flow-row{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:0.7rem;font-weight:600;}
+        .flow-step{flex:1;text-align:center;padding:6px 4px;border-radius:6px;background:#fff;border:1px solid var(--border);}
+        .flow-step.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+        .flow-arrow{color:var(--muted);font-size:0.9rem;}
+        .small-info{font-size:0.72rem;color:var(--muted);margin-top:5px;line-height:1.5;}
+        details{background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-top:8px;}
+        details summary{font-size:0.78rem;font-weight:600;color:var(--navy);cursor:pointer;}
+        details[open] summary{margin-bottom:8px;}
+        .backend-status{background:linear-gradient(135deg,#0f1f3d,#1a3160);color:#fff;border-radius:10px;padding:14px 16px;margin-bottom:14px;}
+        .backend-status .bs-title{font-size:0.78rem;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;}
+        .backend-status .bs-row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+        .backend-status .bs-state{font-size:0.95rem;font-weight:700;}
+        .backend-status .bs-conn{padding:3px 10px;border-radius:14px;font-size:0.7rem;font-weight:700;}
+        .conn-ok{background:#10b981;color:#fff;}
+        .conn-err{background:#ef4444;color:#fff;}
+        .conn-warn{background:#f59e0b;color:#fff;}
+    </style>
+</head>
+<body>
+
+<div class="sending-toast" id="sendingToast">
+    <div class="spinner"></div>
+    <span id="sendingMsg">Procesando...</span>
+</div>
+
+<header class="header">
+    <div class="header-left">
+        <div class="h-icon">📋</div>
+        <div>
+            <div class="h-title">Solicitudes de <span>Pedido</span> <span class="rol-badge rol-sol" id="rolBadge">SOLICITANTE</span></div>
+            <div class="h-sub" id="backendStatus">⚙️ Backend no configurado</div>
+        </div>
+    </div>
+    <div class="folio-badge">
+        <span class="flab">FOLIO</span>
+        <span class="fl" id="correlativoDisplay">—</span>
+        <span class="fhint">se asigna al enviar</span>
+    </div>
+</header>
+
+<nav class="tabs">
+    <div class="tab active" onclick="showTab('tab-pedido')">📝 Pedido</div>
+    <div class="tab" onclick="showTab('tab-autorizar')">🔐 Autorizar</div>
+    <div class="tab" onclick="showTab('tab-base')">📦 Base</div>
+    <div class="tab" onclick="showTab('tab-historial')">📊 Historial</div>
+    <div class="tab" onclick="showTab('tab-config')">⚙️ Config</div>
+</nav>
+
+<!-- ══ TAB PEDIDO ══ -->
+<div class="page active" id="tab-pedido">
+    <div class="ver-banner hidden" id="updateBanner">
+        <span style="font-size:0.78rem;color:#92400e;font-weight:600;">📥 Nueva versión de la base disponible</span>
+        <button class="ver-btn" onclick="downloadAndApplyDB()">Actualizar</button>
+    </div>
+    <div id="dbMiniStatus" class="pill pill-warn">⏳ Sin base cargada</div>
+
+    <div class="flow-diagram">
+        <div class="flow-row">
+            <div class="flow-step active">1. Solicitante</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">2. Autorizador</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">3. Bodega</div>
+        </div>
+        <div class="small-info" style="text-align:center;margin-top:6px;">El folio único se asigna desde el servidor central al enviar.</div>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><span class="badge">1</span> Datos del Solicitante</div>
+        <div class="field">
+            <label>Nombre del Solicitante</label>
+            <input type="text" id="nombreSolicitante" placeholder="Ej: Juan Pérez" autocomplete="name">
+        </div>
+        <div class="field">
+            <label>Área que Solicita</label>
+            <select id="areaSelect" onchange="onAreaChange()">
+                <option>COCINA</option><option>BARES</option><option>RECEPCION</option>
+                <option>GERENCIA</option><option>MANTENCIÓN</option>
+                <option>HOUSEKEEPING</option><option>AREAS COMUNES</option>
+            </select>
+        </div>
+        <div class="field" id="subAreaWrap" style="display:none;">
+            <label>Sub-grupo / Destino</label>
+            <select id="subAreaSelect"></select>
+            <div class="hint">Especifica el destino dentro del área para mejor control.</div>
+        </div>
+        <div class="field">
+            <label>Fecha y Hora</label>
+            <input type="text" id="fechaSolicitud" readonly>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><span class="badge">2</span> Agregar Productos</div>
+        <div class="search-row">
+            <div class="field"><label>Buscar Producto</label>
+                <input type="text" id="searchInput" placeholder="Escribe nombre…" list="productList" disabled>
+                <datalist id="productList"></datalist>
+            </div>
+            <div class="field qty"><label>Cantidad</label>
+                <input type="number" id="qtyInput" min="1" value="1" disabled>
+            </div>
+            <button class="btn btn-primary" id="addBtn" onclick="addProduct()" disabled style="width:auto;">➕</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><span class="badge">3</span> Detalle del Pedido</div>
+        <div class="table-scroll">
+            <table>
+                <thead><tr><th>Cód.</th><th>Producto</th><th>U.M.</th><th>Cant.</th><th>Costo</th><th>Total</th><th></th></tr></thead>
+                <tbody id="orderBody"><tr class="empty-row"><td colspan="7">🛒 Sin productos aún</td></tr></tbody>
+            </table>
+        </div>
+        <div class="total-bar">
+            <span class="total-label">TOTAL ESTIMADO</span>
+            <span class="total-val">$<span id="totalEstimado">0</span></span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><span class="badge">4</span> Enviar a Autorización</div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:10px;line-height:1.5;">
+            Al enviar, el sistema asigna un <strong>folio único</strong> desde el servidor central, registra el pedido en el Sheet maestro y notifica a los <strong>2 autorizadores</strong> simultáneamente.
+        </p>
+        <button class="btn btn-email btn-full btn-single" id="btnEnviarAut" onclick="enviarAAutorizacion()" disabled>✉️ Enviar a Autorización</button>
+        <button class="btn btn-success btn-full btn-single" onclick="generateLocalWord()">📄 Descargar Word (sin enviar)</button>
+        <button class="btn btn-excel btn-full" onclick="generateCurrentExcel()">📊 Descargar Excel</button>
+    </div>
+</div>
+
+<!-- ══ TAB AUTORIZAR ══ -->
+<div class="page" id="tab-autorizar">
+
+    <div class="flow-diagram">
+        <div class="flow-row">
+            <div class="flow-step">1. Solicitante</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step active">2. Autorizador</div>
+            <div class="flow-arrow">→</div>
+            <div class="flow-step">3. Bodega</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><span class="badge">1</span> Cargar Pedido a Autorizar</div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:10px;line-height:1.5;">
+            Hay 2 formas de cargar el pedido: <strong>(A)</strong> escribir el N° de folio y consultarlo al servidor, o <strong>(B)</strong> pegar el código completo del correo.
+        </p>
+        <div class="field">
+            <label>(A) Buscar por N° de Folio</label>
+            <div style="display:flex;gap:8px;">
+                <input type="text" id="folioInputAut" placeholder="0042" style="flex:1;font-family:'JetBrains Mono',monospace;">
+                <button class="btn btn-primary" onclick="cargarPedidoPorFolio()" style="width:auto;">🔍 Buscar</button>
+            </div>
+        </div>
+        <details>
+            <summary>(B) Pegar código del correo</summary>
+            <div class="field" style="margin-top:8px;">
+                <label>Código del Pedido</label>
+                <textarea id="codigoPedidoInput" rows="4" placeholder="Pega aquí el código que recibiste por correo..."></textarea>
+            </div>
+            <button class="btn btn-primary btn-full" onclick="cargarPedidoAutorizar()">🔍 Cargar desde código</button>
+        </details>
+        <div id="loadAutStatus" class="hint" style="margin-top:8px;"></div>
+    </div>
+
+    <div id="autorizadorPanel" style="display:none;">
+        <div class="card">
+            <div class="card-title"><span class="badge">2</span> Datos del Pedido</div>
+            <div id="autHeaderInfo" style="font-size:0.84rem;line-height:1.7;color:var(--text);"></div>
+        </div>
+
+        <div class="card">
+            <div class="card-title"><span class="badge">3</span> Revisar y Modificar Cantidades</div>
+            <p class="small-info" style="margin-bottom:10px;">Edita la columna <strong>"Aprobada"</strong> para reducir cantidades. Usa ✕ para quitar productos completos.</p>
+            <div class="table-scroll">
+                <table>
+                    <thead><tr><th>Cód.</th><th>Producto</th><th>U.M.</th><th>Solic.</th><th>Aprobada</th><th>Costo</th><th>Total</th><th></th></tr></thead>
+                    <tbody id="autOrderBody"></tbody>
+                </table>
+            </div>
+            <div class="total-bar">
+                <span class="total-label">TOTAL APROBADO</span>
+                <span class="total-val">$<span id="autTotalAprobado">0</span></span>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title"><span class="badge">4</span> Decisión</div>
+            <div class="field">
+                <label>Observaciones (opcional / obligatoria si rechaza)</label>
+                <textarea id="autObservaciones" rows="2" style="font-family:'Outfit',sans-serif;font-size:0.84rem;" placeholder="Ej: Se redujo cantidad por stock disponible..."></textarea>
+            </div>
+            <button class="btn btn-success btn-full btn-single" onclick="aprobarPedido()">✅ APROBAR y Enviar a Bodega</button>
+            <button class="btn btn-danger btn-full btn-single" style="padding:11px 16px;font-size:0.84rem;" onclick="rechazarPedido()">❌ RECHAZAR Pedido</button>
+            <div class="hint" style="margin-top:6px;">El servidor central registrará la decisión y enviará los correos correspondientes.</div>
+        </div>
+    </div>
+</div>
+
+<!-- ══ TAB BASE ══ -->
+<div class="page" id="tab-base">
+    <div class="db-panel">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+            <div>
+                <div style="font-size:0.82rem;font-weight:700;color:var(--navy);">📦 Base de Datos Activa</div>
+                <div style="font-size:0.72rem;color:var(--muted);margin-top:1px;" id="dbLastUpdate">Sin cargar</div>
+            </div>
+            <button class="btn btn-teal" style="width:auto;" onclick="refreshFromURL()">🔄 Actualizar</button>
+        </div>
+        <div class="db-stats">
+            <div class="db-stat"><div class="sv" id="dbProductCount">0</div><div class="sl">Productos</div></div>
+            <div class="db-stat"><div class="sv" id="dbVersion">—</div><div class="sl">Versión</div></div>
+        </div>
+        <div id="dbStatusPill" class="pill pill-warn" style="margin-top:10px;">⏳ Sin base cargada</div>
+    </div>
+
+    <div class="card" style="border-color:#ddd6fe;background:linear-gradient(135deg,#fff,#faf5ff);">
+        <div class="card-title">☁️ Subir Inventario al Servidor (Recomendado)</div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:10px;line-height:1.5;">
+            El encargado sube su Excel/CSV una sola vez. Se guarda en el Sheet maestro y <strong>todos los celulares lo reciben automáticamente</strong> al abrir la app.
+        </p>
+        <div style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:7px;padding:10px 12px;margin-bottom:12px;font-size:0.74rem;color:#5b21b6;line-height:1.5;">
+            <strong>📋 Formato esperado:</strong><br>
+            Fila 1 = encabezados. Columnas en este orden: <code>Código · Nombre · Unidad · ... · Costo</code> (Costo en columna 6 si tiene 6 columnas, o columna 4 si tiene solo 4).
+        </div>
+        <label for="invUploadInput">
+            <div style="border:2px dashed var(--purple);border-radius:8px;padding:18px;text-align:center;cursor:pointer;background:#fff;">
+                <div style="font-size:1.6rem;margin-bottom:4px;">☁️</div>
+                <div style="font-size:0.84rem;font-weight:700;color:var(--purple);">Toca para subir Excel o CSV</div>
+                <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">Reemplaza el inventario completo del servidor</div>
+            </div>
+        </label>
+        <input type="file" id="invUploadInput" accept=".xlsx,.xls,.csv" style="display:none;">
+        <div id="invUploadStatus" class="hint" style="margin-top:8px;"></div>
+        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <button class="btn btn-teal" id="btnDownloadInv" onclick="downloadInventoryFromBackend()" disabled>⬇️ Descargar del Servidor</button>
+            <button class="btn btn-outline" onclick="checkInventoryInfo()">ℹ️ Ver Info Servidor</button>
+        </div>
+        <div id="invInfo" style="font-size:0.72rem;color:var(--muted);margin-top:8px;line-height:1.5;"></div>
+    </div>
+
+    <details style="background:transparent;border:none;padding:0;margin-bottom:14px;">
+        <summary style="font-size:0.78rem;color:var(--muted);cursor:pointer;padding:8px 0;">⚙️ Métodos alternativos (avanzado)</summary>
+
+    <div class="card">
+        <div class="card-title">🌐 URL automática — Google Sheets</div>
+        <div class="field">
+            <label>URL CSV del Google Sheet</label>
+            <input type="url" id="sheetsUrlInput" placeholder="https://docs.google.com/spreadsheets/d/.../pub?...output=csv" style="font-size:0.74rem;">
+            <div class="hint">Archivo → Publicar en la web → Formato CSV → Copiar enlace</div>
+        </div>
+        <button class="btn btn-primary" onclick="saveAndFetchURL()">💾 Guardar URL y Descargar Base</button>
+    </div>
+
+    <div class="card">
+        <div class="card-title">📂 Cargar CSV manualmente</div>
+        <label for="csvFileInput">
+            <div style="border:2px dashed var(--border);border-radius:8px;padding:18px;text-align:center;cursor:pointer;background:#f8fafc;">
+                <div style="font-size:1.4rem;margin-bottom:4px;">📁</div>
+                <div style="font-size:0.82rem;font-weight:600;color:var(--navy);">Toca para seleccionar CSV</div>
+                <div style="font-size:0.72rem;color:var(--muted);">Columnas: Código, Nombre, Unidad, ..., Costo (col.6)</div>
+            </div>
+        </label>
+        <input type="file" id="csvFileInput" accept=".csv" style="display:none;">
+        <div id="loadStatus" class="pill pill-warn" style="margin-top:10px;">⏳ Esperando archivo...</div>
+    </div>
+    </details>
+</div>
+
+<!-- ══ TAB HISTORIAL ══ -->
+<div class="page" id="tab-historial">
+    <div class="acum-grid">
+        <div class="acum-stat-card"><div class="av" id="acumPend">—</div><div class="al">Pendientes</div></div>
+        <div class="acum-stat-card"><div class="av" id="acumAprob">—</div><div class="al">Aprobados</div></div>
+        <div class="acum-stat-card"><div class="av" id="acumRech">—</div><div class="al">Rechazados</div></div>
+    </div>
+    <div class="acum-grid" style="grid-template-columns:1fr 1fr;">
+        <div class="acum-stat-card"><div class="av" id="acumCount">—</div><div class="al">Total Pedidos</div></div>
+        <div class="acum-stat-card"><div class="av" id="acumMonto">—</div><div class="al">$ Aprobado</div></div>
+    </div>
+    <div class="card">
+        <div class="card-title">🌐 Historial Central (Google Sheet)</div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:10px;">El historial completo vive en el Google Sheet del backend, accesible para gerencia en tiempo real.</p>
+        <button class="btn btn-primary btn-full btn-single" onclick="refreshStats()">🔄 Actualizar Estadísticas</button>
+        <button class="btn btn-teal btn-full" onclick="abrirSheet()">📊 Abrir Google Sheet Maestro</button>
+    </div>
+    <div class="card">
+        <div class="card-title">🕐 Últimos Pedidos (servidor)</div>
+        <div id="recentList" style="font-size:0.78rem;color:var(--muted);">Toca "Actualizar Estadísticas" para cargar.</div>
+    </div>
+</div>
+
+<!-- ══ TAB CONFIG ══ -->
+<div class="page" id="tab-config">
+
+    <div class="backend-status" id="backendStatusBox">
+        <div class="bs-title">🌐 Estado del Backend</div>
+        <div class="bs-row">
+            <div>
+                <div class="bs-state" id="bsState">No conectado</div>
+                <div style="font-size:0.7rem;color:#94a3b8;margin-top:2px;" id="bsDetail">Configura la URL del Apps Script</div>
+            </div>
+            <span class="bs-conn conn-warn" id="bsConn">Sin probar</span>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">🔗 URL del Backend (Google Apps Script)</div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:12px;">
+            Pega aquí la URL terminada en <code>/exec</code> que generaste al desplegar el Apps Script como Aplicación Web.
+        </p>
+        <div class="field">
+            <label>URL Web App</label>
+            <input type="url" id="cfgGasUrl" placeholder="https://script.google.com/macros/s/AKfyc.../exec" style="font-size:0.74rem;">
+        </div>
+        <div class="btn-row">
+            <button class="btn btn-primary" onclick="saveConfig()">💾 Guardar</button>
+            <button class="btn btn-amber" onclick="probarBackend()">🧪 Probar conexión</button>
+        </div>
+        <div id="testResult" style="font-size:0.78rem;margin-top:10px;"></div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">👤 Mi Rol y Mis Datos</div>
+        <div class="field">
+            <label>¿Qué rol tengo en este celular?</label>
+            <select id="cfgRol">
+                <option value="solicitante">Solicitante (genera pedidos)</option>
+                <option value="autorizador">Autorizador (aprueba o rechaza)</option>
+                <option value="bodega">Bodega Central (recibe finales)</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Mi Nombre</label>
+            <input type="text" id="cfgMiNombre" placeholder="Ej: Juan Pérez">
+            <div class="hint">Aparece automáticamente en el campo "Solicitante" al crear un pedido.</div>
+        </div>
+        <div class="field">
+            <label>Mi Email (para notificaciones)</label>
+            <input type="email" id="cfgEmailUsuario" placeholder="mi-correo@empresa.com">
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title">📬 Destinatarios del Flujo</div>
+        <div class="field">
+            <label>📩 Email Bodega Central</label>
+            <input type="email" id="cfgEmailBodega" placeholder="bodega@miempresa.com">
+        </div>
+        <div class="field">
+            <label>Nombre Bodega (opcional)</label>
+            <input type="text" id="cfgNombreBodega" placeholder="Encargado de Bodega">
+        </div>
+        <details style="margin-top:12px;">
+            <summary>👤 Autorizador 1</summary>
+            <div class="field" style="margin-top:8px;">
+                <label>Email Autorizador 1</label>
+                <input type="email" id="cfgEmailAut1" placeholder="autorizador1@miempresa.com">
+            </div>
+            <div class="field">
+                <label>Nombre Autorizador 1</label>
+                <input type="text" id="cfgNombreAut1" placeholder="Ej: María González">
+            </div>
+        </details>
+        <details>
+            <summary>👤 Autorizador 2</summary>
+            <div class="field" style="margin-top:8px;">
+                <label>Email Autorizador 2</label>
+                <input type="email" id="cfgEmailAut2" placeholder="autorizador2@miempresa.com">
+            </div>
+            <div class="field">
+                <label>Nombre Autorizador 2</label>
+                <input type="text" id="cfgNombreAut2" placeholder="Ej: Carlos Soto">
+            </div>
+        </details>
+        <details>
+            <summary>📊 URL del Sheet Maestro (opcional)</summary>
+            <div class="field" style="margin-top:8px;">
+                <label>URL del Sheet Backend</label>
+                <input type="url" id="cfgSheetUrl" placeholder="https://docs.google.com/spreadsheets/d/...">
+                <div class="hint">Para abrir el Sheet maestro desde el botón en pestaña Historial.</div>
+            </div>
+        </details>
+    </div>
+
+    <div class="card">
+        <div class="card-title">📖 Resumen del flujo</div>
+        <ol class="step-guide">
+            <li>El <strong>Solicitante</strong> crea su pedido y toca <strong>"Enviar a Autorización"</strong>. El backend asigna un <strong>folio único</strong> y notifica a los 2 autorizadores.</li>
+            <li>Cualquier <strong>Autorizador</strong> abre el correo, copia el folio (o el código) y lo pega en pestaña 🔐 Autorizar. Modifica cantidades si es necesario y aprueba o rechaza.</li>
+            <li>Si <strong>aprueba</strong>: el Word final llega a Bodega Central + el solicitante recibe notificación.</li>
+            <li>Si <strong>rechaza</strong>: el solicitante recibe el motivo. Bodega no recibe nada.</li>
+            <li>Todo queda registrado automáticamente en el <strong>Google Sheet maestro</strong> visible para gerencia.</li>
+        </ol>
+    </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// CONFIGURACIÓN GLOBAL
+// ═══════════════════════════════════════════════════════════════
+const SUB_AREAS = {
+    'COCINA': ['Desayuno','Almuerzo','Cena','Eventos','Ventas Especiales','Casino Personal','Aseo'],
+    'BARES':  ['Pedido Bar','Quincho','Eventos','Ventas Especiales','Aseo']
+};
+let inventoryData = [], orderItems = [], cfg = {};
+let pedidoActualAut = null;
+let backendOnline = false;
+
+// ═══════════════════════════════════════════════════════════════
+// BACKEND — Llamadas al Google Apps Script
+// ═══════════════════════════════════════════════════════════════
+async function callGAS(action, params) {
+    if (!cfg.gasUrl) throw new Error('Backend URL no configurada');
+    const body = JSON.stringify(Object.assign({ action }, params || {}));
+    // Usamos text/plain para evitar preflight CORS — Apps Script lo parsea con e.postData.contents
+    const res = await fetch(cfg.gasUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body, redirect: 'follow'
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const j = await res.json();
+    if (!j.ok) throw new Error(j.error || 'Error backend');
+    return j;
+}
+
+async function probarBackend() {
+    const url = document.getElementById('cfgGasUrl').value.trim();
+    if (!url) { alert("⚠️ Ingresa primero la URL del Apps Script."); return; }
+    const r = document.getElementById('testResult');
+    r.innerText = '⏳ Probando conexión...';
+    r.style.color = 'var(--muted)';
+    try {
+        const tmp = cfg.gasUrl;
+        cfg.gasUrl = url;
+        const j = await callGAS('ping');
+        cfg.gasUrl = tmp;
+        r.innerHTML = `✅ <strong>Backend OK</strong><br>Sheet: <code>${j.sheet}</code><br>Versión: ${j.version}<br>Hora servidor: ${new Date(j.timestamp).toLocaleString('es-CL')}`;
+        r.style.color = 'var(--green)';
+        setBackendUI(true, `Conectado a ${j.sheet}`);
+    } catch(e) {
+        r.innerText = '❌ Error: ' + e.message + '\n\nVerifica:\n• La URL termina en /exec\n• El Apps Script está desplegado como Aplicación Web\n• El acceso es "Cualquier usuario"';
+        r.style.color = 'var(--red)';
+        setBackendUI(false, e.message);
+    }
+}
+
+function setBackendUI(online, detail) {
+    backendOnline = online;
+    const conn = document.getElementById('bsConn');
+    const state = document.getElementById('bsState');
+    const det = document.getElementById('bsDetail');
+    const hdr = document.getElementById('backendStatus');
+    if (online) {
+        conn.className = 'bs-conn conn-ok'; conn.innerText = '✅ Online';
+        state.innerText = 'Conectado al servidor central';
+        det.innerText = detail || 'Listo para operar';
+        hdr.innerText = '🌐 Backend Online';
+    } else {
+        conn.className = 'bs-conn conn-err'; conn.innerText = '❌ Offline';
+        state.innerText = 'Sin conexión al backend';
+        det.innerText = detail || 'Configura la URL';
+        hdr.innerText = '⚠️ Backend Offline';
+    }
+    document.getElementById('btnEnviarAut').disabled = !online || !inventoryData.length;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONFIG — Guardado y carga
+// ═══════════════════════════════════════════════════════════════
+function loadConfig() {
+    const raw = localStorage.getItem('configV5');
+    if (raw) cfg = JSON.parse(raw);
+    applyConfigUI();
+    if (cfg.gasUrl) silentPing();
+}
+
+function applyConfigUI() {
+    const fields = ['gasUrl','rol','miNombre','emailUsuario','emailBodega','nombreBodega','emailAut1','nombreAut1','emailAut2','nombreAut2','sheetUrl'];
+    fields.forEach(k => {
+        const el = document.getElementById('cfg' + k.charAt(0).toUpperCase() + k.slice(1));
+        if (el) el.value = cfg[k] || '';
+    });
+
+    // Auto-rellenar nombre solicitante si está configurado
+    if (cfg.miNombre && !document.getElementById('nombreSolicitante').value) {
+        document.getElementById('nombreSolicitante').value = cfg.miNombre;
+    }
+
+    // Rol badge
+    const rb = document.getElementById('rolBadge');
+    const rol = cfg.rol || 'solicitante';
+    if (rol === 'solicitante') { rb.className = 'rol-badge rol-sol'; rb.innerText = 'SOLICITANTE'; }
+    else if (rol === 'autorizador') { rb.className = 'rol-badge rol-aut'; rb.innerText = 'AUTORIZADOR'; }
+    else if (rol === 'bodega') { rb.className = 'rol-badge rol-bod'; rb.innerText = 'BODEGA'; }
+}
+
+function saveConfig() {
+    cfg = {
+        gasUrl:        document.getElementById('cfgGasUrl').value.trim(),
+        rol:           document.getElementById('cfgRol').value,
+        miNombre:      document.getElementById('cfgMiNombre').value.trim(),
+        emailUsuario:  document.getElementById('cfgEmailUsuario').value.trim(),
+        emailBodega:   document.getElementById('cfgEmailBodega').value.trim(),
+        nombreBodega:  document.getElementById('cfgNombreBodega').value.trim(),
+        emailAut1:     document.getElementById('cfgEmailAut1').value.trim(),
+        nombreAut1:    document.getElementById('cfgNombreAut1').value.trim(),
+        emailAut2:     document.getElementById('cfgEmailAut2').value.trim(),
+        nombreAut2:    document.getElementById('cfgNombreAut2').value.trim(),
+        sheetUrl:      document.getElementById('cfgSheetUrl').value.trim()
+    };
+    if (!cfg.gasUrl) { alert("⚠️ La URL del Backend es obligatoria."); return; }
+    localStorage.setItem('configV5', JSON.stringify(cfg));
+    applyConfigUI();
+    alert("✅ Configuración guardada.\n\nRecuerda probar la conexión con el botón 🧪.");
+    silentPing();
+}
+
+async function silentPing() {
+    if (!cfg.gasUrl) { setBackendUI(false, 'URL no configurada'); return; }
+    try {
+        const j = await callGAS('ping');
+        setBackendUI(true, `Sheet: ${j.sheet}`);
+    } catch(e) {
+        setBackendUI(false, e.message);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════════
+function showToast(msg) {
+    document.getElementById('sendingMsg').innerText = msg;
+    document.getElementById('sendingToast').classList.add('show');
+}
+function hideToast() { document.getElementById('sendingToast').classList.remove('show'); }
+
+async function blobToBase64(blob) {
+    return new Promise((res, rej) => {
+        const r = new FileReader(); r.onloadend = () => res(r.result); r.onerror = rej; r.readAsDataURL(blob);
+    });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ÁREA / SUB-ÁREA
+// ═══════════════════════════════════════════════════════════════
+function onAreaChange() {
+    const area = document.getElementById('areaSelect').value;
+    const wrap = document.getElementById('subAreaWrap');
+    const sel  = document.getElementById('subAreaSelect');
+    if (SUB_AREAS[area]) {
+        sel.innerHTML = '';
+        SUB_AREAS[area].forEach(s => { const o = document.createElement('option'); o.value = s; o.innerText = s; sel.appendChild(o); });
+        wrap.style.display = 'block';
+    } else {
+        wrap.style.display = 'none';
+        sel.innerHTML = '';
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════════════════════
+function showTab(id) {
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    const idx = ['tab-pedido','tab-autorizar','tab-base','tab-historial','tab-config'].indexOf(id);
+    document.querySelectorAll('.tab')[idx].classList.add('active');
+    if (id === 'tab-historial' && backendOnline) refreshStats();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CLOCK
+// ═══════════════════════════════════════════════════════════════
+function updateClock() { const n = new Date(), el = document.getElementById('fechaSolicitud'); if(el) el.value = n.toLocaleDateString('es-CL') + ' ' + n.toLocaleTimeString('es-CL'); }
+updateClock(); setInterval(updateClock, 1000);
+
+// ═══════════════════════════════════════════════════════════════
+// BASE DE DATOS — CSV / Google Sheets
+// ═══════════════════════════════════════════════════════════════
+function setP(id, type, msg) { const el = document.getElementById(id); if(!el) return; el.className='pill '+(type==='ok'?'pill-ok':type==='err'?'pill-err':'pill-warn'); el.innerText=msg; }
+
+function parseCSV(text, source) {
+    try {
+        const lines = text.split(/\r?\n/);
+        if (lines.length < 2) throw new Error("Archivo vacío.");
+        const delim = lines[0].includes(';') ? ';' : ',';
+        const regex = new RegExp(`${delim}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
+        const newData = []; const dl = document.getElementById('productList'); dl.innerHTML = '';
+        for (let i = 1; i < lines.length; i++) {
+            const line = lines[i].trim(); if (!line) continue;
+            const cols = line.split(regex);
+            if (cols.length >= 6) {
+                let codigo = (cols[0]||'').replace(/^"|"$/g,'').trim()||'S/N';
+                let nombre = (cols[1]||'').replace(/^"|"$/g,'').trim();
+                let unidad = (cols[2]||'').replace(/^"|"$/g,'').trim()||'S/I';
+                if (!nombre) continue;
+                let costo = parseFloat((cols[5]||'').replace(/^"|"$/g,'').replace(/\$/g,'').replace(/\./g,'').replace(',','.')) || 0;
+                newData.push({ codigo, nombre, unidad, costo });
+                const o = document.createElement('option'); o.value = nombre; dl.appendChild(o);
+            }
+        }
+        if (!newData.length) throw new Error("Sin productos.");
+        inventoryData = newData;
+        const meta = { timestamp: new Date().toISOString(), source, count: newData.length, version: new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL') };
+        localStorage.setItem('inventoryData', JSON.stringify(newData));
+        localStorage.setItem('inventoryMeta', JSON.stringify(meta));
+        enableSearch(true); updateDBPanel(meta);
+        setP('dbMiniStatus','ok',`✅ ${newData.length} productos`);
+        setP('loadStatus','ok',`✅ ${newData.length} productos cargados`);
+        document.getElementById('btnEnviarAut').disabled = !backendOnline;
+        return true;
+    } catch(e) {
+        setP('loadStatus','err','❌ ' + e.message);
+        setP('dbMiniStatus','err','❌ Error en base');
+        return false;
+    }
+}
+
+function enableSearch(on) { ['searchInput','qtyInput'].forEach(id=>document.getElementById(id).disabled=!on); document.getElementById('addBtn').disabled=!on; }
+
+function updateDBPanel(meta) {
+    document.getElementById('dbProductCount').innerText = meta.count||inventoryData.length;
+    document.getElementById('dbVersion').innerText = meta.version||'—';
+    document.getElementById('dbLastUpdate').innerText = (meta.source==='url'?'Google Sheets — ':'Manual — ')+(meta.version||'');
+    setP('dbStatusPill','ok',`✅ Base activa (${meta.count||inventoryData.length} productos)`);
+}
+
+(function initDB() {
+    const raw = localStorage.getItem('inventoryData');
+    const meta = JSON.parse(localStorage.getItem('inventoryMeta')||'{}');
+    if (raw) {
+        try {
+            inventoryData = JSON.parse(raw);
+            const dl = document.getElementById('productList'); dl.innerHTML = '';
+            inventoryData.forEach(p => { const o=document.createElement('option'); o.value=p.nombre; dl.appendChild(o); });
+            enableSearch(true); updateDBPanel(meta);
+            setP('dbMiniStatus','ok',`✅ ${inventoryData.length} productos`);
+            setP('loadStatus','ok',`✅ ${inventoryData.length} productos en memoria`);
+            const url = localStorage.getItem('sheetsURL');
+            if (url) { document.getElementById('sheetsUrlInput').value = url; setTimeout(()=>silentRefresh(url), 2500); }
+        } catch(e) {}
+    }
+})();
+
+function saveAndFetchURL() {
+    const url = document.getElementById('sheetsUrlInput').value.trim();
+    if (!url) { alert("Ingresa una URL."); return; }
+    localStorage.setItem('sheetsURL', url); downloadAndApplyDB(url);
+}
+function refreshFromURL() {
+    const url = localStorage.getItem('sheetsURL');
+    if (!url) { alert("Primero configura la URL."); showTab('tab-base'); return; }
+    downloadAndApplyDB(url);
+}
+async function downloadAndApplyDB(url) {
+    url = url || localStorage.getItem('sheetsURL'); if (!url) return;
+    setP('loadStatus','warn','⏳ Descargando...'); setP('dbMiniStatus','warn','⏳ Actualizando...');
+    document.getElementById('updateBanner').classList.add('hidden');
+    try {
+        const r = await fetch(url + '&t=' + Date.now(), { cache:'no-store' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        if (parseCSV(await r.text(), 'url')) alert(`✅ Base actualizada: ${inventoryData.length} productos.`);
+    } catch(e) { setP('loadStatus','err','❌ '+e.message); setP('dbMiniStatus','err','❌ Error'); alert("❌ No se pudo descargar la base.\n\n• Verifica la URL\n• El Sheet debe estar publicado como CSV"); }
+}
+async function silentRefresh(url) {
+    try {
+        const r = await fetch(url + '&t=' + Date.now(), { cache:'no-store' });
+        if (!r.ok) return;
+        const count = (await r.text()).split(/\r?\n/).filter(l=>l.trim()).length - 1;
+        if (count !== inventoryData.length) document.getElementById('updateBanner').classList.remove('hidden');
+    } catch(e) {}
+}
+
+document.getElementById('csvFileInput').addEventListener('change', function(e) {
+    const f = e.target.files[0]; if (!f) return;
+    setP('loadStatus','warn','⏳ Procesando...');
+    const r = new FileReader(); r.onload = ev => parseCSV(ev.target.result, 'manual'); r.readAsText(f, 'UTF-8');
+});
+
+// ═══════════════════════════════════════════════════════════════
+// PRODUCTOS — Add / Remove / Render
+// ═══════════════════════════════════════════════════════════════
+function addProduct() {
+    const sv = document.getElementById('searchInput').value.trim();
+    const qv = parseFloat(document.getElementById('qtyInput').value);
+    if (!sv || qv <= 0) { alert("Producto y cantidad requeridos."); return; }
+    const prod = inventoryData.find(p => p.nombre.toLowerCase() === sv.toLowerCase());
+    if (!prod) { alert("Producto no encontrado."); return; }
+    orderItems.push({ id:Date.now()+Math.random(), ...prod, cantidad:qv, total:qv*prod.costo });
+    document.getElementById('searchInput').value=''; document.getElementById('qtyInput').value=1;
+    document.getElementById('searchInput').focus(); renderTable();
+}
+document.getElementById('searchInput').addEventListener('keydown', e => { if(e.key==='Enter') addProduct(); });
+
+function renderTable() {
+    const tbody = document.getElementById('orderBody'); tbody.innerHTML='';
+    let total = 0;
+    if (!orderItems.length) { tbody.innerHTML='<tr class="empty-row"><td colspan="7">🛒 Sin productos aún</td></tr>'; }
+    else { orderItems.forEach(item => { total+=item.total; const tr=document.createElement('tr');
+        tr.innerHTML=`<td style="font-family:monospace;font-size:.72rem;">${item.codigo}</td>
+            <td class="td-name">${item.nombre}</td><td><strong>${item.unidad}</strong></td>
+            <td>${item.cantidad}</td>
+            <td style="font-family:monospace;font-size:.75rem;">$${item.costo.toLocaleString('es-CL')}</td>
+            <td style="font-family:monospace;font-size:.75rem;">$${item.total.toLocaleString('es-CL')}</td>
+            <td><button class="btn btn-danger" onclick="removeItem(${item.id})">✕</button></td>`;
+        tbody.appendChild(tr); }); }
+    document.getElementById('totalEstimado').innerText = total.toLocaleString('es-CL');
+}
+function removeItem(id) { orderItems=orderItems.filter(i=>i.id!==id); renderTable(); }
+
+function validateHeader() {
+    const nombre = document.getElementById('nombreSolicitante').value.trim();
+    if (!nombre) { alert("⚠️ Ingresa el Nombre del Solicitante."); document.getElementById('nombreSolicitante').focus(); return null; }
+    if (!orderItems.length) { alert("⚠️ El pedido está vacío."); return null; }
+    const area = document.getElementById('areaSelect').value;
+    const subArea = SUB_AREAS[area] ? document.getElementById('subAreaSelect').value : '';
+    return { nombre, area, subArea, fecha:new Date().toLocaleDateString('es-CL'), hora:new Date().toLocaleTimeString('es-CL'), emailSolicitante: cfg.emailUsuario || '' };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CODIFICACIÓN PARA EMAIL
+// ═══════════════════════════════════════════════════════════════
+function encodeOrder(payload) { return btoa(unescape(encodeURIComponent(JSON.stringify(payload)))); }
+function decodeOrder(code) { return JSON.parse(decodeURIComponent(escape(atob(code.replace(/\s+/g,'').trim())))); }
+
+function buildOrderPayload(folio, h, items) {
+    return {
+        v: 5, folio,
+        fecha: h.fecha, hora: h.hora,
+        area: h.area, subArea: h.subArea || '',
+        solicitante: h.nombre,
+        emailSolicitante: h.emailSolicitante || '',
+        items: items.map(i => ({ codigo: i.codigo, nombre: i.nombre, unidad: i.unidad, cantidad: i.cantidad, costo: i.costo }))
+    };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// WORD
+// ═══════════════════════════════════════════════════════════════
+function buildWordBlob(folio, h, items, estado, autInfo) {
+    const total = items.reduce((s,i)=>s+(i.cantidad*i.costo),0).toLocaleString('es-CL');
+    let stColor='#92400e', stBg='#fef3c7', stTxt='⏳ PENDIENTE DE AUTORIZACIÓN';
+    if (estado === 'aprobado') { stColor='#065f46'; stBg='#d1fae5'; stTxt='✅ APROBADO POR AUTORIZADOR'; }
+    else if (estado === 'rechazado') { stColor='#991b1b'; stBg='#fee2e2'; stTxt='❌ RECHAZADO'; }
+
+    const rows = items.map(i => {
+        const cantOrig = i.cantidadOriginal !== undefined && i.cantidadOriginal !== i.cantidad
+            ? `<span style="color:#92400e;text-decoration:line-through;font-size:8pt;">${i.cantidadOriginal}</span> → <strong>${i.cantidad}</strong>`
+            : i.cantidad;
+        return `<tr><td>${i.codigo}</td><td style="text-align:left">${i.nombre}</td><td>${i.unidad}</td><td>${cantOrig}</td><td>$${(i.costo||0).toLocaleString('es-CL')}</td><td>$${((i.cantidad||0)*(i.costo||0)).toLocaleString('es-CL')}</td></tr>`;
+    }).join('');
+
+    const subAreaTxt = h.subArea ? ` &nbsp;|&nbsp; <strong>Sub-grupo:</strong> ${h.subArea}` : '';
+    const autSection = (estado !== 'pendiente_aut' && autInfo) ? `
+        <div style="background:${stBg};border-left:4px solid ${stColor};padding:10px 14px;margin-top:14px;">
+            <p style="font-size:10pt;margin:2px 0;"><strong>${estado === 'aprobado' ? 'Autorizado por' : 'Rechazado por'}:</strong> ${autInfo.nombreAut}</p>
+            <p style="font-size:10pt;margin:2px 0;"><strong>Fecha de decisión:</strong> ${autInfo.fechaDecision}</p>
+            ${autInfo.observaciones ? `<p style="font-size:10pt;margin:2px 0;"><strong>Observaciones:</strong> ${autInfo.observaciones}</p>` : ''}
+        </div>` : '';
+
+    const c = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word'><head><meta charset='utf-8'><style>body{font-family:Arial}h1{text-align:center;color:#0f1f3d;border-bottom:2px solid #2563eb;padding-bottom:8px;font-size:16pt}p{font-size:10pt;margin:4px 0}table{border-collapse:collapse;width:100%;font-size:9pt;margin-top:14px}th,td{border:1px solid #333;padding:5px 8px;text-align:center}th{background:#0f1f3d;color:#fff}.t{text-align:right;font-weight:bold;font-size:12pt;margin-top:12px;color:#15803d}.fl{display:inline-block;border-top:1px solid #333;width:155px;padding-top:4px;text-align:center;font-size:8pt;margin:0 8px}.estado{display:inline-block;padding:5px 14px;border-radius:14px;font-weight:bold;font-size:10pt;background:${stBg};color:${stColor};margin-bottom:8px;}</style></head><body>
+    <h1>SOLICITUD DE PEDIDO INTERNO</h1>
+    <p style="text-align:center;"><span class="estado">${stTxt}</span></p>
+    <p><strong>N° Folio:</strong> ${folio} &nbsp;&nbsp; <strong>Área:</strong> ${h.area}${subAreaTxt}</p>
+    <p><strong>Solicitado por:</strong> ${h.solicitante || h.nombre}</p>
+    <p><strong>Fecha y Hora:</strong> ${h.fecha} ${h.hora}</p>
+    <table><thead><tr><th>Código</th><th>Producto</th><th>U.M.</th><th>Cantidad</th><th>Costo</th><th>Total</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="t">TOTAL ESTIMADO: $${total}</div>
+    ${autSection}
+    <div style="margin-top:60px;text-align:center"><span class="fl">${h.solicitante || h.nombre}<br>Solicitante</span><span class="fl">${autInfo ? autInfo.nombreAut : 'Autorizador'}<br>Autoriza</span><span class="fl">Bodega Central<br>Recibe</span></div>
+    </body></html>`;
+    return new Blob(['﻿', c], { type: 'application/msword' });
+}
+
+function generateLocalWord() {
+    const h = validateHeader(); if (!h) return;
+    const blob = buildWordBlob('BORRADOR', h, orderItems, 'pendiente_aut', null);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `BORRADOR_${h.area}.doc`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+function generateCurrentExcel() {
+    const h = validateHeader(); if (!h) return;
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet([
+        ['SOLICITUD DE PEDIDO INTERNO (Borrador)'],
+        [`Área: ${h.area}`,`Sub-grupo: ${h.subArea||'—'}`,`Solicitante: ${h.nombre}`,`Fecha: ${h.fecha} ${h.hora}`],[],
+        ['Código','Nombre Producto','Unidad','Cantidad','Costo Unitario','Valor Total'],
+        ...orderItems.map(i=>[i.codigo,i.nombre,i.unidad,i.cantidad,i.costo,i.total]),
+        [],['','','','','TOTAL',orderItems.reduce((s,i)=>s+i.total,0)]
+    ]);
+    ws['!cols'] = [14,35,10,16,16,16].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb, ws, 'Pedido');
+    XLSX.writeFile(wb, `BORRADOR_${h.area}.xlsx`);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ENVIAR A AUTORIZACIÓN — Asigna folio + envía emails + registra
+// ═══════════════════════════════════════════════════════════════
+async function enviarAAutorizacion() {
+    const h = validateHeader(); if (!h) return;
+    if (!cfg.gasUrl) { alert("⚠️ Configura primero la URL del Backend en pestaña ⚙️ Config."); return; }
+    if (!cfg.emailAut1 || !cfg.emailAut2) { alert("⚠️ Configura los 2 emails de autorizadores."); return; }
+
+    let folio;
+    try {
+        showToast('Asignando folio único...');
+        const r = await callGAS('getFolio');
+        folio = r.folio;
+        document.getElementById('correlativoDisplay').innerText = folio;
+        hideToast();
+    } catch(e) {
+        hideToast();
+        alert("❌ No se pudo asignar folio: " + e.message);
+        return;
+    }
+
+    const payload = buildOrderPayload(folio, h, orderItems);
+    const codigo = encodeOrder(payload);
+    const blob = buildWordBlob(folio, h, orderItems, 'pendiente_aut', null);
+    const fname = `SOLICITUD_${folio}_${h.area}_PENDIENTE.doc`;
+    const totalMonto = orderItems.reduce((s,i)=>s+i.total,0);
+    const subAreaTxt = h.subArea ? ` (${h.subArea})` : '';
+
+    // Convertir blob a base64 para enviarlo al backend
+    let attachment = '';
+    try {
+        attachment = await blobToBase64(blob);
+    } catch(e) { attachment = ''; }
+
+    const subject = `🔐 Pedido N° ${folio} pendiente de autorización — ${h.area}${subAreaTxt}`;
+    const message = `Estimado/a Autorizador,
+
+Se solicita su autorización para el siguiente pedido:
+
+• N° Folio: ${folio}
+• Solicitante: ${h.nombre}
+• Área: ${h.area}${subAreaTxt}
+• Fecha: ${h.fecha} ${h.hora}
+• Productos: ${orderItems.length} líneas
+• Total estimado: $${totalMonto.toLocaleString('es-CL')}
+
+============================================
+PARA AUTORIZAR:
+1. Abra la app de Pedidos en su celular
+2. Vaya a la pestaña 🔐 Autorizar
+3. Escriba el N° de folio: ${folio} y toque Buscar
+   (alternativa: pegue el código de abajo)
+4. Revise, modifique cantidades si es necesario, y aprueba o rechaza
+
+--- INICIO CÓDIGO ---
+${codigo}
+--- FIN CÓDIGO ---
+
+Cualquiera de los 2 autorizadores (${cfg.nombreAut1||'Aut. 1'} o ${cfg.nombreAut2||'Aut. 2'}) puede actuar sobre este pedido.
+
+Sistema de Pedidos Internos`;
+
+    let ok1 = false, ok2 = false, errMsgs = [];
+
+    try {
+        showToast('Enviando a Autorizador 1...');
+        await callGAS('sendEmail', { to: cfg.emailAut1, name: cfg.nombreAut1 || 'Autorizador 1', subject, message, attachment, filename: fname });
+        ok1 = true;
+    } catch(e) { errMsgs.push('Aut1: ' + e.message); }
+
+    try {
+        showToast('Enviando a Autorizador 2...');
+        await callGAS('sendEmail', { to: cfg.emailAut2, name: cfg.nombreAut2 || 'Autorizador 2', subject, message, attachment, filename: fname });
+        ok2 = true;
+    } catch(e) { errMsgs.push('Aut2: ' + e.message); }
+
+    // Registrar pedido en backend (incluso si falló email, queda evidencia)
+    try {
+        showToast('Registrando en Sheet maestro...');
+        await callGAS('registerPedido', {
+            folio, fecha: h.fecha, hora: h.hora,
+            estado: 'pendiente_aut', area: h.area, subArea: h.subArea,
+            solicitante: h.nombre, emailSolicitante: h.emailSolicitante,
+            totalItems: orderItems.length, totalMonto,
+            items: orderItems.map(i => ({ codigo: i.codigo, nombre: i.nombre, unidad: i.unidad, cantidad: i.cantidad, costo: i.costo }))
+        });
+    } catch(e) { errMsgs.push('Registro: ' + e.message); }
+
+    hideToast();
+
+    if (ok1 || ok2) {
+        let msg = `✅ Pedido N° ${folio} enviado a autorización.\n`;
+        msg += ok1 ? `✅ ${cfg.nombreAut1||'Aut1'}: ${cfg.emailAut1}\n` : `❌ Aut1 falló\n`;
+        msg += ok2 ? `✅ ${cfg.nombreAut2||'Aut2'}: ${cfg.emailAut2}` : `❌ Aut2 falló`;
+        if (errMsgs.length) msg += '\n\n⚠️ Errores:\n' + errMsgs.join('\n');
+        alert(msg);
+        // Limpiar pedido
+        orderItems = []; renderTable();
+        document.getElementById('correlativoDisplay').innerText = '—';
+    } else {
+        alert(`❌ No se pudo enviar a ningún autorizador.\n\n${errMsgs.join('\n')}`);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AUTORIZAR — Cargar / Aprobar / Rechazar
+// ═══════════════════════════════════════════════════════════════
+async function cargarPedidoPorFolio() {
+    const folio = document.getElementById('folioInputAut').value.trim().padStart(4,'0');
+    if (!folio) { alert("Ingresa un N° de folio."); return; }
+    const status = document.getElementById('loadAutStatus');
+    status.innerText = '⏳ Buscando en servidor...';
+    try {
+        const r = await callGAS('getPedido', { folio });
+        const c = r.cabecera, items = r.items;
+        if (c.Estado && c.Estado !== 'pendiente_aut') {
+            if (!confirm(`Este pedido ya está en estado ${c.Estado}. ¿Cargarlo de todos modos?`)) {
+                status.innerText = ''; return;
+            }
+        }
+        pedidoActualAut = {
+            v: 5, folio, fecha: c.Fecha, hora: c.Hora,
+            area: c['Área'], subArea: c['Sub-grupo'],
+            solicitante: c.Solicitante, emailSolicitante: c['Email Solicitante'],
+            items: items.map(it => ({
+                codigo: it['Código'], nombre: it.Producto, unidad: it.Unidad,
+                cantidad: parseFloat(it['Cant. Aprobada']) || parseFloat(it['Cant. Solicitada']) || 0,
+                cantidadOriginal: parseFloat(it['Cant. Solicitada']) || 0,
+                costo: parseFloat(it.Costo) || 0,
+                _id: Math.random()
+            }))
+        };
+        renderAutPanel();
+        status.innerText = `✅ Pedido ${folio} cargado desde servidor.`;
+        status.style.color = 'var(--green)';
+    } catch(e) {
+        status.innerText = '❌ ' + e.message;
+        status.style.color = 'var(--red)';
+        pedidoActualAut = null;
+        document.getElementById('autorizadorPanel').style.display = 'none';
+    }
+}
+
+function cargarPedidoAutorizar() {
+    const code = document.getElementById('codigoPedidoInput').value.trim();
+    const status = document.getElementById('loadAutStatus');
+    if (!code) { status.innerText = '⚠️ Pega el código primero.'; status.style.color='var(--red)'; return; }
+    try {
+        const p = decodeOrder(code);
+        if (!p.items || !p.items.length) throw new Error('Pedido sin productos.');
+        p.items = p.items.map(i => ({ ...i, cantidadOriginal: i.cantidad, _id: Math.random() }));
+        pedidoActualAut = p;
+        renderAutPanel();
+        status.innerText = `✅ Pedido N° ${p.folio} cargado desde código.`;
+        status.style.color = 'var(--green)';
+    } catch(e) {
+        status.innerText = '❌ Código inválido: ' + e.message;
+        status.style.color = 'var(--red)';
+        pedidoActualAut = null;
+        document.getElementById('autorizadorPanel').style.display = 'none';
+    }
+}
+
+function renderAutPanel() {
+    if (!pedidoActualAut) return;
+    const p = pedidoActualAut;
+    const sub = p.subArea ? ` <span class="estado-pill" style="background:#dbeafe;color:#1e40af;">${p.subArea}</span>` : '';
+    document.getElementById('autHeaderInfo').innerHTML = `
+        <strong>Folio:</strong> ${p.folio} &nbsp;|&nbsp; <strong>Solicitante:</strong> ${p.solicitante}<br>
+        <strong>Área:</strong> ${p.area}${sub}<br>
+        <strong>Fecha solicitud:</strong> ${p.fecha} ${p.hora}<br>
+        ${p.emailSolicitante ? `<strong>Email solicitante:</strong> ${p.emailSolicitante}<br>` : ''}
+    `;
+
+    const tbody = document.getElementById('autOrderBody'); tbody.innerHTML = '';
+    p.items.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td style="font-family:monospace;font-size:.72rem;">${item.codigo}</td>
+            <td class="td-name">${item.nombre}</td>
+            <td><strong>${item.unidad}</strong></td>
+            <td>${item.cantidadOriginal}</td>
+            <td><input class="qty-edit" type="number" min="0" step="any" value="${item.cantidad}" data-id="${item._id}" oninput="recalcAut()"></td>
+            <td style="font-family:monospace;font-size:.75rem;">$${(item.costo||0).toLocaleString('es-CL')}</td>
+            <td class="td-total" style="font-family:monospace;font-size:.75rem;" data-id="${item._id}">$${((item.cantidad||0)*(item.costo||0)).toLocaleString('es-CL')}</td>
+            <td><button class="btn btn-danger" onclick="removeAutItem('${item._id}')">✕</button></td>`;
+        tbody.appendChild(tr);
+    });
+    document.getElementById('autorizadorPanel').style.display = 'block';
+    recalcAut();
+}
+
+function recalcAut() {
+    if (!pedidoActualAut) return;
+    let total = 0;
+    document.querySelectorAll('#autOrderBody tr').forEach(tr => {
+        const inp = tr.querySelector('.qty-edit'); if (!inp) return;
+        const id = inp.dataset.id;
+        const item = pedidoActualAut.items.find(i => String(i._id) === id); if (!item) return;
+        const newQ = parseFloat(inp.value) || 0;
+        item.cantidad = newQ;
+        const totItem = newQ * (item.costo || 0);
+        total += totItem;
+        const tdTot = tr.querySelector('.td-total[data-id="'+id+'"]'); if (tdTot) tdTot.innerText = '$'+totItem.toLocaleString('es-CL');
+        if (newQ !== item.cantidadOriginal) inp.classList.add('modificado'); else inp.classList.remove('modificado');
+    });
+    document.getElementById('autTotalAprobado').innerText = total.toLocaleString('es-CL');
+}
+
+function removeAutItem(id) {
+    if (!pedidoActualAut) return;
+    pedidoActualAut.items = pedidoActualAut.items.filter(i => String(i._id) !== id);
+    if (!pedidoActualAut.items.length) { alert("⚠️ No puedes quitar todos los productos. Mejor RECHAZA el pedido."); return; }
+    renderAutPanel();
+}
+
+function limpiarAutorizacion() {
+    document.getElementById('codigoPedidoInput').value = '';
+    document.getElementById('folioInputAut').value = '';
+    document.getElementById('loadAutStatus').innerText = '';
+    document.getElementById('autorizadorPanel').style.display = 'none';
+    document.getElementById('autObservaciones').value = '';
+    pedidoActualAut = null;
+}
+
+async function aprobarPedido() {
+    if (!pedidoActualAut) return;
+    if (!cfg.emailBodega) { alert("⚠️ Configura el Email Bodega Central."); return; }
+    if (pedidoActualAut.items.some(i => i.cantidad <= 0)) { alert("⚠️ Hay productos con cantidad 0."); return; }
+
+    const nombreAut = cfg.miNombre || prompt("Tu nombre como autorizador:", cfg.nombreAut1 || cfg.nombreAut2 || '') || 'Autorizador';
+    const obs = document.getElementById('autObservaciones').value.trim();
+    const fechaDecision = new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL');
+    const autInfo = { nombreAut, observaciones: obs, fechaDecision };
+
+    const p = pedidoActualAut;
+    const h = { area: p.area, subArea: p.subArea, nombre: p.solicitante, solicitante: p.solicitante, fecha: p.fecha, hora: p.hora };
+    const blob = buildWordBlob(p.folio, h, p.items, 'aprobado', autInfo);
+    const fname = `SOLICITUD_${p.folio}_${p.area}_APROBADO.doc`;
+    const totalMonto = p.items.reduce((s,i)=>s+(i.cantidad*(i.costo||0)),0);
+    const subAreaTxt = p.subArea ? ` (${p.subArea})` : '';
+    const modificados = p.items.filter(i => i.cantidad !== i.cantidadOriginal).length;
+    let attachment = ''; try { attachment = await blobToBase64(blob); } catch(e) {}
+
+    const subject = `✅ Pedido N° ${p.folio} APROBADO — ${p.area}${subAreaTxt}`;
+    const message = `Estimado/a ${cfg.nombreBodega || 'Encargado de Bodega'},
+
+Adjunto pedido APROBADO para preparación.
+
+• N° Folio: ${p.folio}
+• Solicitante: ${p.solicitante}
+• Área: ${p.area}${subAreaTxt}
+• Fecha solicitud: ${p.fecha} ${p.hora}
+• Productos aprobados: ${p.items.length} líneas
+• Total aprobado: $${totalMonto.toLocaleString('es-CL')}
+• Cantidades modificadas: ${modificados}
+
+✅ Autorizado por: ${nombreAut}
+📅 Fecha decisión: ${fechaDecision}
+${obs ? '📝 Observaciones: ' + obs : ''}
+
+Sistema de Pedidos Internos`;
+
+    try {
+        showToast('Enviando aprobación a Bodega...');
+        await callGAS('sendEmail', { to: cfg.emailBodega, name: cfg.nombreBodega || 'Bodega', subject, message, attachment, filename: fname });
+
+        // Notificar solicitante
+        if (p.emailSolicitante) {
+            showToast('Notificando al solicitante...');
+            await callGAS('sendEmail', {
+                to: p.emailSolicitante, name: p.solicitante,
+                subject: `✅ Tu Pedido N° ${p.folio} fue APROBADO`,
+                message: `Hola ${p.solicitante},\n\nTu pedido N° ${p.folio} (${p.area}${subAreaTxt}) fue aprobado por ${nombreAut} y enviado a Bodega Central.\n\n• Productos aprobados: ${p.items.length}\n• Total: $${totalMonto.toLocaleString('es-CL')}\n${modificados ? `• Cantidades modificadas: ${modificados}\n` : ''}${obs ? '• Observaciones: ' + obs + '\n' : ''}\nSistema de Pedidos Internos`
+            });
+        }
+
+        // Actualizar estado en backend
+        showToast('Actualizando registro central...');
+        await callGAS('updatePedidoStatus', {
+            folio: p.folio, estado: 'aprobado',
+            autorizador: nombreAut, observaciones: obs,
+            fechaDecision, totalMonto,
+            items: p.items.map(i => ({ codigo: i.codigo, cantidad: i.cantidad, costo: i.costo }))
+        });
+
+        hideToast();
+        alert(`✅ Pedido N° ${p.folio} aprobado y enviado a Bodega.${p.emailSolicitante ? '\n✉️ Solicitante notificado.' : ''}\n📊 Registro central actualizado.`);
+        limpiarAutorizacion();
+    } catch(e) {
+        hideToast();
+        alert("❌ Error: " + e.message);
+    }
+}
+
+async function rechazarPedido() {
+    if (!pedidoActualAut) return;
+    const obs = document.getElementById('autObservaciones').value.trim();
+    if (!obs) { alert("⚠️ Indica el motivo del rechazo en Observaciones."); return; }
+
+    const nombreAut = cfg.miNombre || prompt("Tu nombre como autorizador:", cfg.nombreAut1 || cfg.nombreAut2 || '') || 'Autorizador';
+    const fechaDecision = new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL');
+    const p = pedidoActualAut;
+    const subAreaTxt = p.subArea ? ` (${p.subArea})` : '';
+
+    try {
+        if (p.emailSolicitante) {
+            showToast('Notificando rechazo al solicitante...');
+            await callGAS('sendEmail', {
+                to: p.emailSolicitante, name: p.solicitante,
+                subject: `❌ Tu Pedido N° ${p.folio} fue RECHAZADO`,
+                message: `Hola ${p.solicitante},\n\nTu pedido N° ${p.folio} (${p.area}${subAreaTxt}) fue RECHAZADO por ${nombreAut}.\n\n📝 Motivo:\n${obs}\n\n📅 Fecha: ${fechaDecision}\n\nPuedes generar un nuevo pedido ajustado.\n\nSistema de Pedidos Internos`
+            });
+        }
+        if (cfg.emailBodega) {
+            await callGAS('sendEmail', {
+                to: cfg.emailBodega, name: cfg.nombreBodega || 'Bodega',
+                subject: `❌ Pedido N° ${p.folio} RECHAZADO — ${p.area}${subAreaTxt}`,
+                message: `Para su información:\n\nEl pedido N° ${p.folio} de ${p.solicitante} fue RECHAZADO por ${nombreAut}.\n\nMotivo: ${obs}\n\nNo requiere acción.\n\nSistema de Pedidos Internos`
+            });
+        }
+        showToast('Actualizando registro central...');
+        await callGAS('updatePedidoStatus', {
+            folio: p.folio, estado: 'rechazado',
+            autorizador: nombreAut, observaciones: obs, fechaDecision
+        });
+        hideToast();
+        alert(`❌ Pedido N° ${p.folio} rechazado.${p.emailSolicitante ? '\n✉️ Solicitante notificado.' : ''}\n📊 Registro central actualizado.`);
+        limpiarAutorizacion();
+    } catch(e) {
+        hideToast();
+        alert("❌ Error: " + e.message);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HISTORIAL — Stats desde el backend
+// ═══════════════════════════════════════════════════════════════
+async function refreshStats() {
+    if (!cfg.gasUrl) { alert("Configura primero el Backend."); return; }
+    try {
+        showToast('Consultando servidor...');
+        const stats = await callGAS('getStats');
+        document.getElementById('acumPend').innerText = stats.pendientes;
+        document.getElementById('acumAprob').innerText = stats.aprobados;
+        document.getElementById('acumRech').innerText = stats.rechazados;
+        document.getElementById('acumCount').innerText = stats.total;
+        document.getElementById('acumMonto').innerText = '$' + (stats.monto||0).toLocaleString('es-CL');
+        const lista = await callGAS('getPedidos');
+        renderRecentList(lista.pedidos);
+        hideToast();
+    } catch(e) {
+        hideToast();
+        alert("❌ Error al consultar servidor: " + e.message);
+    }
+}
+
+function renderRecentList(pedidos) {
+    const el = document.getElementById('recentList');
+    if (!pedidos || !pedidos.length) { el.innerText='Sin registros aún.'; return; }
+    el.innerHTML = pedidos.slice(0, 10).map(p => {
+        const est = p.Estado || 'pendiente_aut';
+        const sub = p['Sub-grupo'] ? ` · ${p['Sub-grupo']}` : '';
+        const pillCls = est === 'aprobado' ? 'est-aprob' : est === 'rechazado' ? 'est-rech' : 'est-pend';
+        const pillTxt = est === 'aprobado' ? '✅ Aprobado' : est === 'rechazado' ? '❌ Rechazado' : '⏳ Pendiente';
+        const fecha = p.Fecha instanceof Date ? p.Fecha.toLocaleDateString('es-CL') : p.Fecha;
+        return `<div style="padding:10px 0;border-bottom:1px solid var(--border);">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+                <div style="font-weight:600;color:var(--navy);">Folio ${p.Folio} — ${p['Área']}${sub}</div>
+                <span class="estado-pill ${pillCls}">${pillTxt}</span>
+            </div>
+            <div style="color:var(--muted);font-size:0.74rem;margin-top:2px;">${p.Solicitante} · ${fecha}${p.Autorizador ? ' · Aut: '+p.Autorizador : ''}</div>
+            <div style="color:var(--teal);font-weight:600;font-size:0.78rem;margin-top:2px;">$${(parseFloat(p['Total $'])||0).toLocaleString('es-CL')} · ${p['N° Items']||0} productos</div>
+        </div>`;
+    }).join('');
+}
+
+function abrirSheet() {
+    if (!cfg.sheetUrl) { alert("Configura la URL del Sheet maestro en pestaña ⚙️ Config (sección colapsable)."); return; }
+    window.open(cfg.sheetUrl, '_blank');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INVENTARIO — Subir / Descargar / Auto-sync
+// ═══════════════════════════════════════════════════════════════
+function parseRowsToProducts(rows) {
+    if (!rows || rows.length < 2) return [];
+    const headers = rows[0].map(h => String(h || '').toLowerCase().trim());
+    const findCol = (...names) => {
+        for (const n of names) {
+            const idx = headers.findIndex(h => h.includes(n));
+            if (idx >= 0) return idx;
+        }
+        return -1;
+    };
+    let cIdx = findCol('código','codigo','cod');
+    let nIdx = findCol('nombre','producto','descripcion','descripción');
+    let uIdx = findCol('unidad','um','medida');
+    let pIdx = findCol('costo','precio','valor');
+    if (nIdx < 0) {
+        cIdx = 0; nIdx = 1; uIdx = 2;
+        pIdx = rows[0].length >= 6 ? 5 : 3;
+    }
+    const products = [];
+    for (let i = 1; i < rows.length; i++) {
+        const r = rows[i]; if (!r) continue;
+        const nombre = String(r[nIdx] || '').trim();
+        if (!nombre) continue;
+        const codigo = String(r[cIdx] !== undefined ? r[cIdx] : 'S/N').trim() || 'S/N';
+        const unidad = String(r[uIdx] || 'S/I').trim() || 'S/I';
+        let costo = r[pIdx];
+        if (typeof costo === 'string') costo = parseFloat(costo.replace(/\$/g,'').replace(/\./g,'').replace(',','.'));
+        costo = Number(costo) || 0;
+        products.push({ codigo, nombre, unidad, costo });
+    }
+    return products;
+}
+
+function applyInventoryFromProducts(products, sourceLabel) {
+    inventoryData = products;
+    const dl = document.getElementById('productList'); dl.innerHTML = '';
+    inventoryData.forEach(p => { const o = document.createElement('option'); o.value = p.nombre; dl.appendChild(o); });
+    enableSearch(true);
+    const meta = { timestamp: new Date().toISOString(), source: sourceLabel || 'upload', count: products.length, version: new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL') };
+    localStorage.setItem('inventoryData', JSON.stringify(products));
+    localStorage.setItem('inventoryMeta', JSON.stringify(meta));
+    updateDBPanel(meta);
+    setP('dbStatusPill','ok',`✅ Base activa (${products.length} productos)`);
+    setP('dbMiniStatus','ok',`✅ ${products.length} productos`);
+    setP('loadStatus','ok',`✅ ${products.length} productos cargados`);
+    document.getElementById('btnEnviarAut').disabled = !backendOnline;
+}
+
+document.getElementById('invUploadInput').addEventListener('change', async function(e) {
+    const f = e.target.files[0]; if (!f) return;
+    const status = document.getElementById('invUploadStatus');
+    status.innerText = '⏳ Procesando archivo ' + f.name + '...';
+    status.style.color = 'var(--muted)';
+
+    try {
+        let products = [];
+        const isCSV = f.name.toLowerCase().endsWith('.csv');
+        if (isCSV) {
+            const text = await f.text();
+            const lines = text.split(/\r?\n/);
+            const delim = lines[0].includes(';') ? ';' : ',';
+            const regex = new RegExp(`${delim}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
+            const rows = lines.filter(l => l.trim()).map(l => l.split(regex).map(c => c.replace(/^"|"$/g,'').trim()));
+            products = parseRowsToProducts(rows);
+        } else {
+            const buf = await f.arrayBuffer();
+            const wb = XLSX.read(buf, { type: 'array' });
+            const sheet = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
+            products = parseRowsToProducts(rows);
+        }
+
+        if (!products.length) throw new Error('No se detectaron productos válidos en el archivo.');
+        status.innerText = `⏳ ${products.length} productos detectados. Subiendo al servidor central...`;
+
+        if (!cfg.gasUrl || !backendOnline) {
+            applyInventoryFromProducts(products, 'upload-local');
+            status.innerText = `⚠️ Backend offline — ${products.length} productos cargados solo en este celular.\nCuando el backend esté online, vuelve a subir.`;
+            status.style.color = 'var(--amber)';
+            e.target.value = '';
+            return;
+        }
+
+        showToast('Subiendo al servidor central...');
+        const j = await callGAS('uploadInventory', {
+            products,
+            uploader: cfg.miNombre || cfg.emailUsuario || 'desconocido',
+            filename: f.name
+        });
+        hideToast();
+
+        applyInventoryFromProducts(products, 'upload-server');
+        localStorage.setItem('inventoryServerStamp', j.timestamp || '');
+        status.innerHTML = `✅ <strong>${j.count} productos</strong> subidos al servidor central.<br>Todos los celulares lo recibirán al abrir la app.`;
+        status.style.color = 'var(--green)';
+        document.getElementById('btnDownloadInv').disabled = false;
+        e.target.value = '';
+    } catch(err) {
+        hideToast();
+        status.innerText = '❌ ' + err.message;
+        status.style.color = 'var(--red)';
+    }
+});
+
+async function downloadInventoryFromBackend() {
+    if (!cfg.gasUrl || !backendOnline) { alert("Backend no conectado."); return; }
+    const status = document.getElementById('invUploadStatus');
+    showToast('Descargando del servidor...');
+    try {
+        const j = await callGAS('getInventory');
+        hideToast();
+        if (!j.products || !j.products.length) { alert("⚠️ El servidor no tiene inventario cargado aún."); return; }
+        applyInventoryFromProducts(j.products, 'server-pull');
+        localStorage.setItem('inventoryServerStamp', j.lastUpload || '');
+        const last = j.lastUpload ? new Date(j.lastUpload).toLocaleString('es-CL') : 'desconocido';
+        status.innerHTML = `✅ <strong>${j.products.length} productos</strong> descargados del servidor.<br>Última subida: ${last} por ${j.lastUploader || '—'}`;
+        status.style.color = 'var(--green)';
+    } catch(e) {
+        hideToast();
+        alert('❌ ' + e.message);
+    }
+}
+
+async function checkInventoryInfo() {
+    if (!cfg.gasUrl || !backendOnline) { alert("Backend no conectado."); return; }
+    const info = document.getElementById('invInfo');
+    info.innerText = '⏳ Consultando...';
+    try {
+        const j = await callGAS('inventoryInfo');
+        const last = j.lastUpload ? new Date(j.lastUpload).toLocaleString('es-CL') : '—';
+        info.innerHTML = `<strong>📊 Servidor:</strong> ${j.count} productos<br><strong>📅 Última subida:</strong> ${last}<br><strong>👤 Subido por:</strong> ${j.lastUploader || '—'}<br><strong>📁 Archivo:</strong> ${j.lastFilename || '—'}`;
+    } catch(e) {
+        info.innerText = '❌ ' + e.message;
+    }
+}
+
+async function autoCheckServerInventory() {
+    if (!cfg.gasUrl) return;
+    try {
+        const j = await callGAS('inventoryInfo');
+        const localStamp = localStorage.getItem('inventoryServerStamp') || '';
+        if (j.lastUpload && j.lastUpload !== localStamp && j.count > 0) {
+            // Servidor tiene una versión más nueva — ofrecer descarga
+            document.getElementById('updateBanner').classList.remove('hidden');
+            document.getElementById('updateBanner').querySelector('span').innerText = `📥 Hay un inventario más nuevo en el servidor (${j.count} productos)`;
+            document.getElementById('updateBanner').querySelector('button').onclick = downloadInventoryFromBackend;
+        }
+        document.getElementById('btnDownloadInv').disabled = !(j.count > 0);
+    } catch(e) {}
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+onAreaChange();
+loadConfig();
+// Tras cargar config y verificar backend, revisamos si hay nuevo inventario
+setTimeout(() => { if (backendOnline) autoCheckServerInventory(); }, 3500);
+
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>
