@@ -146,6 +146,45 @@
     <span id="sendingMsg">Procesando...</span>
 </div>
 
+<!-- ══ MODAL MAPEO DE COLUMNAS ══ -->
+<div id="columnMappingModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,31,61,0.7);z-index:1000;align-items:center;justify-content:center;padding:14px;overflow-y:auto;">
+    <div style="background:#fff;border-radius:14px;padding:20px;max-width:540px;width:100%;max-height:92vh;overflow-y:auto;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <h3 style="font-size:1.05rem;color:var(--navy);font-weight:800;">📋 Mapear Columnas</h3>
+            <button onclick="closeMapping()" style="background:none;border:none;font-size:1.4rem;color:var(--muted);cursor:pointer;">×</button>
+        </div>
+        <p style="font-size:0.78rem;color:var(--muted);margin-bottom:12px;line-height:1.5;">
+            Confirma o ajusta qué columna de tu archivo corresponde a cada campo. La app guarda tu elección para próximas subidas.
+        </p>
+
+        <div style="background:#0f1f3d;color:#e2e8f0;border-radius:8px;padding:10px;margin-bottom:14px;font-family:'JetBrains Mono',monospace;font-size:0.66rem;line-height:1.5;overflow-x:auto;white-space:pre;" id="mapPreview"></div>
+
+        <div class="field">
+            <label>Columna del Código</label>
+            <select id="mapCodigoCol"></select>
+        </div>
+        <div class="field">
+            <label>Columna del Nombre / Producto / Descripción <span style="color:var(--red);">*</span></label>
+            <select id="mapNombreCol"></select>
+        </div>
+        <div class="field">
+            <label>Columna de la Unidad</label>
+            <select id="mapUnidadCol"></select>
+        </div>
+        <div class="field">
+            <label>Columna del Costo / Precio</label>
+            <select id="mapCostoCol"></select>
+        </div>
+
+        <div id="mapDetectInfo" style="background:#fef3c7;border-radius:7px;padding:8px 12px;font-size:0.74rem;color:#92400e;margin-bottom:12px;line-height:1.5;display:none;"></div>
+
+        <div class="btn-row">
+            <button class="btn btn-success" onclick="confirmMappingAndUpload()">✅ Confirmar y Subir</button>
+            <button class="btn btn-outline" onclick="closeMapping()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
 <header class="header">
     <div class="header-left">
         <div class="h-icon">📋</div>
@@ -1307,111 +1346,231 @@ function abrirSheet() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// INVENTARIO — Subir / Descargar / Auto-sync
+// INVENTARIO — Subir / Descargar / Auto-sync con mapeo de columnas
 // ═══════════════════════════════════════════════════════════════
-function parseRowsToProducts(rows) {
-    if (!rows || rows.length < 2) return [];
-    const headers = rows[0].map(h => String(h || '').toLowerCase().trim());
-    const findCol = (...names) => {
-        for (const n of names) {
-            const idx = headers.findIndex(h => h.includes(n));
-            if (idx >= 0) return idx;
+
+// Pendientes mientras se muestra el modal
+let pendingRows = null;
+let pendingFilename = null;
+
+function stripAccents(s) {
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function detectColumnMapping(headers) {
+    const norm = headers.map(h => stripAccents(String(h || '')).toLowerCase().trim());
+
+    // Puntaje por coincidencia: exacta=100, palabra=85, subpalabra=40
+    const scoreHeader = (header, keywords) => {
+        let max = 0;
+        for (const kw of keywords) {
+            const k = stripAccents(kw).toLowerCase();
+            if (header === k) max = Math.max(max, 100);
+            else if (header.startsWith(k + ' ') || header.endsWith(' ' + k)) max = Math.max(max, 85);
+            else if (header.includes(' ' + k + ' ') || header.includes('/' + k) || header.includes(k + '/')) max = Math.max(max, 75);
+            else if (header.includes(k)) max = Math.max(max, 40);
         }
-        return -1;
+        return max;
     };
-    let cIdx = findCol('código','codigo','cod');
-    let nIdx = findCol('nombre','producto','descripcion','descripción');
-    let uIdx = findCol('unidad','um','medida');
-    let pIdx = findCol('costo','precio','valor');
-    if (nIdx < 0) {
-        cIdx = 0; nIdx = 1; uIdx = 2;
-        pIdx = rows[0].length >= 6 ? 5 : 3;
+
+    const fieldKeywords = {
+        codigo: ['codigo','cod','sku','clave','referencia','ref'],
+        nombre: ['nombre','producto','descripcion','detalle','articulo','description','desc'],
+        unidad: ['unidad','um','medida','unit','presentacion','formato'],
+        costo:  ['costo','precio','valor','price','cost']
+    };
+
+    // Matriz de puntajes
+    const scores = {};
+    for (const field in fieldKeywords) {
+        scores[field] = norm.map(h => scoreHeader(h, fieldKeywords[field]));
     }
+
+    // Asignación por prioridad: nombre > costo > codigo > unidad (greedy, no se repite columna)
+    const result = { codigo: -1, nombre: -1, unidad: -1, costo: -1 };
+    const taken = new Set();
+    const order = ['nombre','costo','codigo','unidad'];
+    for (const field of order) {
+        let bestIdx = -1, bestScore = 0;
+        for (let i = 0; i < norm.length; i++) {
+            if (taken.has(i)) continue;
+            if (scores[field][i] > bestScore) {
+                bestScore = scores[field][i];
+                bestIdx = i;
+            }
+        }
+        if (bestIdx >= 0 && bestScore > 0) {
+            result[field] = bestIdx;
+            taken.add(bestIdx);
+        }
+    }
+    return result;
+}
+
+function parseCostValue(raw) {
+    if (raw === null || raw === undefined || raw === '') return 0;
+    if (typeof raw === 'number') return raw;
+    let s = String(raw).trim();
+    if (!s) return 0;
+    // Quitar simbolos de moneda y espacios
+    s = s.replace(/[$\s]/g, '');
+    // Si tiene tanto . como , — el último es el decimal
+    const lastDot = s.lastIndexOf('.');
+    const lastComma = s.lastIndexOf(',');
+    if (lastDot >= 0 && lastComma >= 0) {
+        if (lastComma > lastDot) {
+            s = s.replace(/\./g,'').replace(',','.');
+        } else {
+            s = s.replace(/,/g,'');
+        }
+    } else if (lastComma >= 0 && lastDot < 0) {
+        // Solo coma — depende: 1,234 (mil) o 12,5 (decimal)
+        // Si hay 3 dígitos después de la coma, asumimos miles; si no, decimal
+        const after = s.substring(lastComma + 1);
+        if (after.length === 3 && !/\D/.test(after)) s = s.replace(',','');
+        else s = s.replace(',','.');
+    } else if (lastDot >= 0 && lastComma < 0) {
+        // Solo punto — mismo razonamiento
+        const after = s.substring(lastDot + 1);
+        if (after.length === 3 && !/\D/.test(after)) s = s.replace(/\./g,'');
+        // si no, lo dejamos como decimal
+    }
+    return parseFloat(s) || 0;
+}
+
+function showColumnMappingModal(rows, filename) {
+    pendingRows = rows;
+    pendingFilename = filename;
+
+    // Quitar filas vacías al inicio
+    while (pendingRows.length && pendingRows[0].every(c => !c || !String(c).trim())) {
+        pendingRows.shift();
+    }
+    if (pendingRows.length < 2) {
+        alert("⚠️ El archivo no tiene datos suficientes (necesita al menos encabezados + 1 fila).");
+        return;
+    }
+
+    const headers = pendingRows[0] || [];
+
+    // Auto-detectar (con mapeo guardado anterior si existe)
+    const lastMap = JSON.parse(localStorage.getItem('lastColumnMapping') || 'null');
+    const detected = lastMap || detectColumnMapping(headers);
+
+    // Vista previa: encabezados + 3 filas de muestra
+    const trunc = (s, n) => { s = String(s || ''); return s.length > n ? s.substring(0, n-1) + '…' : s; };
+    const cellW = 14;
+    const previewLines = [];
+    previewLines.push('  ' + headers.map((h,i) => `[${i}]${trunc(h, cellW).padEnd(cellW+1)}`).join(''));
+    for (let i = 1; i <= Math.min(3, pendingRows.length-1); i++) {
+        previewLines.push('  ' + pendingRows[i].map((c) => trunc(c, cellW+3).padEnd(cellW+4)).join(''));
+    }
+    document.getElementById('mapPreview').innerText = previewLines.join('\n');
+
+    // Llenar selects
+    const fillSelect = (id, selectedIdx) => {
+        const sel = document.getElementById(id);
+        sel.innerHTML = '<option value="-1">— Ninguna —</option>';
+        headers.forEach((h, i) => {
+            const opt = document.createElement('option');
+            opt.value = i;
+            opt.innerText = `[Col ${i}] ${trunc(h, 30)}`;
+            if (i === selectedIdx) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    };
+    fillSelect('mapCodigoCol', detected.codigo);
+    fillSelect('mapNombreCol', detected.nombre);
+    fillSelect('mapUnidadCol', detected.unidad);
+    fillSelect('mapCostoCol', detected.costo);
+
+    // Mensaje de detección
+    const det = document.getElementById('mapDetectInfo');
+    const detectedFields = [];
+    if (detected.codigo >= 0) detectedFields.push('Código');
+    if (detected.nombre >= 0) detectedFields.push('Nombre');
+    if (detected.unidad >= 0) detectedFields.push('Unidad');
+    if (detected.costo  >= 0) detectedFields.push('Costo');
+    if (detectedFields.length < 4) {
+        det.style.display = 'block';
+        det.innerHTML = `⚠️ <strong>Detección parcial:</strong> reconocí ${detectedFields.length}/4 columnas (${detectedFields.join(', ') || 'ninguna'}). Ajusta los selectores antes de subir.`;
+    } else {
+        det.style.display = 'none';
+    }
+
+    document.getElementById('columnMappingModal').style.display = 'flex';
+}
+
+function closeMapping() {
+    document.getElementById('columnMappingModal').style.display = 'none';
+    pendingRows = null;
+    pendingFilename = null;
+}
+
+async function confirmMappingAndUpload() {
+    const cIdx = parseInt(document.getElementById('mapCodigoCol').value);
+    const nIdx = parseInt(document.getElementById('mapNombreCol').value);
+    const uIdx = parseInt(document.getElementById('mapUnidadCol').value);
+    const pIdx = parseInt(document.getElementById('mapCostoCol').value);
+
+    if (nIdx < 0) {
+        alert("⚠️ Debes seleccionar al menos la columna 'Nombre / Producto'."); return;
+    }
+
     const products = [];
-    for (let i = 1; i < rows.length; i++) {
-        const r = rows[i]; if (!r) continue;
+    for (let i = 1; i < pendingRows.length; i++) {
+        const r = pendingRows[i]; if (!r) continue;
         const nombre = String(r[nIdx] || '').trim();
         if (!nombre) continue;
-        const codigo = String(r[cIdx] !== undefined ? r[cIdx] : 'S/N').trim() || 'S/N';
-        const unidad = String(r[uIdx] || 'S/I').trim() || 'S/I';
-        let costo = r[pIdx];
-        if (typeof costo === 'string') costo = parseFloat(costo.replace(/\$/g,'').replace(/\./g,'').replace(',','.'));
-        costo = Number(costo) || 0;
+        const codigo = cIdx >= 0 ? (String(r[cIdx] !== undefined ? r[cIdx] : '').trim() || 'S/N') : 'S/N';
+        const unidad = uIdx >= 0 ? (String(r[uIdx] || '').trim() || 'S/I') : 'S/I';
+        const costo  = pIdx >= 0 ? parseCostValue(r[pIdx]) : 0;
         products.push({ codigo, nombre, unidad, costo });
     }
-    return products;
+
+    // Guardar mapeo para próxima vez
+    localStorage.setItem('lastColumnMapping', JSON.stringify({ codigo: cIdx, nombre: nIdx, unidad: uIdx, costo: pIdx }));
+
+    closeMapping();
+    await uploadProductsToBackend(products, pendingFilename);
 }
 
-function applyInventoryFromProducts(products, sourceLabel) {
-    inventoryData = products;
-    const dl = document.getElementById('productList'); dl.innerHTML = '';
-    inventoryData.forEach(p => { const o = document.createElement('option'); o.value = p.nombre; dl.appendChild(o); });
-    enableSearch(true);
-    const meta = { timestamp: new Date().toISOString(), source: sourceLabel || 'upload', count: products.length, version: new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL') };
-    localStorage.setItem('inventoryData', JSON.stringify(products));
-    localStorage.setItem('inventoryMeta', JSON.stringify(meta));
-    updateDBPanel(meta);
-    setP('dbStatusPill','ok',`✅ Base activa (${products.length} productos)`);
-    setP('dbMiniStatus','ok',`✅ ${products.length} productos`);
-    setP('loadStatus','ok',`✅ ${products.length} productos cargados`);
-    document.getElementById('btnEnviarAut').disabled = !backendOnline;
-}
-
-document.getElementById('invUploadInput').addEventListener('change', async function(e) {
-    const f = e.target.files[0]; if (!f) return;
+async function uploadProductsToBackend(products, filename) {
     const status = document.getElementById('invUploadStatus');
-    status.innerText = '⏳ Procesando archivo ' + f.name + '...';
+    if (!products.length) {
+        status.innerText = '❌ No se detectaron productos válidos (revisa el mapeo y la columna Nombre).';
+        status.style.color = 'var(--red)';
+        return;
+    }
+    status.innerText = `⏳ ${products.length} productos detectados. Subiendo al servidor central...`;
     status.style.color = 'var(--muted)';
 
+    if (!cfg.gasUrl || !backendOnline) {
+        applyInventoryFromProducts(products, 'upload-local');
+        status.innerText = `⚠️ Backend offline — ${products.length} productos cargados solo en este celular. Cuando el backend esté online, vuelve a subir.`;
+        status.style.color = 'var(--amber)';
+        return;
+    }
+
     try {
-        let products = [];
-        const isCSV = f.name.toLowerCase().endsWith('.csv');
-        if (isCSV) {
-            const text = await f.text();
-            const lines = text.split(/\r?\n/);
-            const delim = lines[0].includes(';') ? ';' : ',';
-            const regex = new RegExp(`${delim}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
-            const rows = lines.filter(l => l.trim()).map(l => l.split(regex).map(c => c.replace(/^"|"$/g,'').trim()));
-            products = parseRowsToProducts(rows);
-        } else {
-            const buf = await f.arrayBuffer();
-            const wb = XLSX.read(buf, { type: 'array' });
-            const sheet = wb.Sheets[wb.SheetNames[0]];
-            const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: '' });
-            products = parseRowsToProducts(rows);
-        }
-
-        if (!products.length) throw new Error('No se detectaron productos válidos en el archivo.');
-        status.innerText = `⏳ ${products.length} productos detectados. Subiendo al servidor central...`;
-
-        if (!cfg.gasUrl || !backendOnline) {
-            applyInventoryFromProducts(products, 'upload-local');
-            status.innerText = `⚠️ Backend offline — ${products.length} productos cargados solo en este celular.\nCuando el backend esté online, vuelve a subir.`;
-            status.style.color = 'var(--amber)';
-            e.target.value = '';
-            return;
-        }
-
         showToast('Subiendo al servidor central...');
         const j = await callGAS('uploadInventory', {
             products,
             uploader: cfg.miNombre || cfg.emailUsuario || 'desconocido',
-            filename: f.name
+            filename: filename || 'sin-nombre'
         });
         hideToast();
-
         applyInventoryFromProducts(products, 'upload-server');
         localStorage.setItem('inventoryServerStamp', j.timestamp || '');
         status.innerHTML = `✅ <strong>${j.count} productos</strong> subidos al servidor central.<br>Todos los celulares lo recibirán al abrir la app.`;
         status.style.color = 'var(--green)';
         document.getElementById('btnDownloadInv').disabled = false;
-        e.target.value = '';
     } catch(err) {
         hideToast();
         status.innerText = '❌ ' + err.message;
         status.style.color = 'var(--red)';
     }
-});
+}
 
 async function downloadInventoryFromBackend() {
     if (!cfg.gasUrl || !backendOnline) { alert("Backend no conectado."); return; }
@@ -1451,12 +1610,13 @@ async function autoCheckServerInventory() {
         const j = await callGAS('inventoryInfo');
         const localStamp = localStorage.getItem('inventoryServerStamp') || '';
         if (j.lastUpload && j.lastUpload !== localStamp && j.count > 0) {
-            // Servidor tiene una versión más nueva — ofrecer descarga
-            document.getElementById('updateBanner').classList.remove('hidden');
-            document.getElementById('updateBanner').querySelector('span').innerText = `📥 Hay un inventario más nuevo en el servidor (${j.count} productos)`;
-            document.getElementById('updateBanner').querySelector('button').onclick = downloadInventoryFromBackend;
+            const banner = document.getElementById('updateBanner');
+            banner.classList.remove('hidden');
+            banner.querySelector('span').innerText = `📥 Hay un inventario más nuevo en el servidor (${j.count} productos)`;
+            banner.querySelector('button').onclick = downloadInventoryFromBackend;
         }
-        document.getElementById('btnDownloadInv').disabled = !(j.count > 0);
+        const btn = document.getElementById('btnDownloadInv');
+        if (btn) btn.disabled = !(j.count > 0);
     } catch(e) {}
 }
 
@@ -1465,7 +1625,6 @@ async function autoCheckServerInventory() {
 // ═══════════════════════════════════════════════════════════════
 onAreaChange();
 loadConfig();
-// Tras cargar config y verificar backend, revisamos si hay nuevo inventario
 setTimeout(() => { if (backendOnline) autoCheckServerInventory(); }, 3500);
 
 if ('serviceWorker' in navigator) {
