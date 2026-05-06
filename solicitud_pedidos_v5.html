@@ -191,6 +191,7 @@
         <div>
             <div class="h-title">Solicitudes de <span>Pedido</span> <span class="rol-badge rol-sol" id="rolBadge">SOLICITANTE</span></div>
             <div class="h-sub" id="backendStatus">⚙️ Backend no configurado</div>
+            <div style="font-size:0.55rem;color:#475569;margin-top:1px;">v5.2 — build 2026-05-06</div>
         </div>
     </div>
     <div class="folio-badge">
@@ -1148,41 +1149,58 @@ Sistema de Pedidos Internos`;
 async function cargarPedidoPorFolio() {
     const raw = document.getElementById('folioInputAut').value.trim();
     if (!raw) { alert("Ingresa un N° de folio."); return; }
-    // Normalizar: quitar ceros iniciales para que coincida con lo guardado en Sheets
-    // (Sheets convierte "0042" → número 42, por eso buscamos "42" no "0042")
-    const folio = gasNormFolio(raw);
-    const folioDisplay = raw.padStart(4, '0'); // solo para mostrar al usuario
     const status = document.getElementById('loadAutStatus');
-    status.innerText = '⏳ Buscando folio ' + folioDisplay + ' en servidor...';
-    try {
-        const r = await callGAS('getPedido', { folio });
-        const c = r.cabecera, items = r.items;
-        if (c.Estado && c.Estado !== 'pendiente_aut') {
-            if (!confirm(`Este pedido ya está en estado ${c.Estado}. ¿Cargarlo de todos modos?`)) {
-                status.innerText = ''; return;
+
+    // Intentar múltiples formatos del folio para cubrir todas las variantes de almacenamiento:
+    // Sheets puede guardar "0042" como número 42 (sin ceros) o como texto "0042" (con ceros)
+    const n = parseInt(raw, 10);
+    const formats = isNaN(n)
+        ? [raw]
+        : [...new Set([String(n), raw.padStart(4, '0'), raw])]; // ej: ["42","0042"]
+
+    status.innerText = '⏳ Buscando folio ' + raw.padStart(4, '0') + ' en servidor...';
+    status.style.color = 'var(--muted)';
+
+    let lastError = null;
+    for (const folio of formats) {
+        try {
+            const r = await callGAS('getPedido', { folio });
+            const c = r.cabecera, items = r.items;
+            if (c.Estado && c.Estado !== 'pendiente_aut') {
+                if (!confirm(`Este pedido ya está en estado "${c.Estado}". ¿Cargarlo de todos modos?`)) {
+                    status.innerText = ''; return;
+                }
             }
+            pedidoActualAut = {
+                v: 5, folio, fecha: c.Fecha, hora: c.Hora,
+                area: c['Área'], subArea: c['Sub-grupo'],
+                solicitante: c.Solicitante, emailSolicitante: c['Email Solicitante'],
+                items: items.map(it => ({
+                    codigo: it['Código'], nombre: it.Producto, unidad: it.Unidad,
+                    cantidad: parseFloat(it['Cant. Aprobada']) || parseFloat(it['Cant. Solicitada']) || 0,
+                    cantidadOriginal: parseFloat(it['Cant. Solicitada']) || 0,
+                    costo: parseFloat(it.Costo) || 0,
+                    _id: Math.random()
+                }))
+            };
+            renderAutPanel();
+            status.innerText = `✅ Pedido ${raw.padStart(4,'0')} cargado desde servidor.`;
+            status.style.color = 'var(--green)';
+            return; // éxito — salir del loop
+        } catch(e) {
+            lastError = e;
+            // Solo reintentar si el error es "no encontrado"; otros errores (red, permisos) → salir
+            const esNoEncontrado = e.message && (e.message.toLowerCase().includes('no encontrado') || e.message.toLowerCase().includes('not found'));
+            if (!esNoEncontrado) break;
         }
-        pedidoActualAut = {
-            v: 5, folio, fecha: c.Fecha, hora: c.Hora,
-            area: c['Área'], subArea: c['Sub-grupo'],
-            solicitante: c.Solicitante, emailSolicitante: c['Email Solicitante'],
-            items: items.map(it => ({
-                codigo: it['Código'], nombre: it.Producto, unidad: it.Unidad,
-                cantidad: parseFloat(it['Cant. Aprobada']) || parseFloat(it['Cant. Solicitada']) || 0,
-                cantidadOriginal: parseFloat(it['Cant. Solicitada']) || 0,
-                costo: parseFloat(it.Costo) || 0,
-                _id: Math.random()
-            }))
-        };
-        renderAutPanel();
-        status.innerText = `✅ Pedido ${folio} cargado desde servidor.`;
-        status.style.color = 'var(--green)';
-    } catch(e) {
-        status.innerText = '❌ ' + e.message;
-        status.style.color = 'var(--red)';
-        pedidoActualAut = null;
-        document.getElementById('autorizadorPanel').style.display = 'none';
     }
+
+    // Todos los formatos fallaron
+    status.innerText = '❌ ' + (lastError ? lastError.message : 'Folio no encontrado') +
+        '\n(Folio buscado: ' + formats.join(' / ') + ')';
+    status.style.color = 'var(--red)';
+    pedidoActualAut = null;
+    document.getElementById('autorizadorPanel').style.display = 'none';
 }
 
 function cargarPedidoAutorizar() {
