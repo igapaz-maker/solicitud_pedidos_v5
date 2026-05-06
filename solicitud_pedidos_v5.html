@@ -571,6 +571,13 @@ let inventoryData = [], orderItems = [], cfg = {};
 let pedidoActualAut = null;
 let backendOnline = false;
 
+// Google Sheets convierte "0042" → número 42 al guardar.
+// Esta función normaliza ambos lados para que coincidan: "0042" / "42" / 42 → "42"
+function gasNormFolio(v) {
+    const n = parseInt(String(v || '').trim(), 10);
+    return isNaN(n) ? String(v || '').trim() : String(n);
+}
+
 // ═══════════════════════════════════════════════════════════════
 // BACKEND — Llamadas al Google Apps Script
 // ═══════════════════════════════════════════════════════════════
@@ -1139,10 +1146,14 @@ Sistema de Pedidos Internos`;
 // AUTORIZAR — Cargar / Aprobar / Rechazar
 // ═══════════════════════════════════════════════════════════════
 async function cargarPedidoPorFolio() {
-    const folio = document.getElementById('folioInputAut').value.trim().padStart(4,'0');
-    if (!folio) { alert("Ingresa un N° de folio."); return; }
+    const raw = document.getElementById('folioInputAut').value.trim();
+    if (!raw) { alert("Ingresa un N° de folio."); return; }
+    // Normalizar: quitar ceros iniciales para que coincida con lo guardado en Sheets
+    // (Sheets convierte "0042" → número 42, por eso buscamos "42" no "0042")
+    const folio = gasNormFolio(raw);
+    const folioDisplay = raw.padStart(4, '0'); // solo para mostrar al usuario
     const status = document.getElementById('loadAutStatus');
-    status.innerText = '⏳ Buscando en servidor...';
+    status.innerText = '⏳ Buscando folio ' + folioDisplay + ' en servidor...';
     try {
         const r = await callGAS('getPedido', { folio });
         const c = r.cabecera, items = r.items;
@@ -1310,7 +1321,7 @@ Sistema de Pedidos Internos`;
         // Actualizar estado en backend
         showToast('Actualizando registro central...');
         await callGAS('updatePedidoStatus', {
-            folio: p.folio, estado: 'aprobado',
+            folio: gasNormFolio(p.folio), estado: 'aprobado',
             autorizador: nombreAut, observaciones: obs,
             fechaDecision, totalMonto,
             items: p.items.map(i => ({ codigo: i.codigo, cantidad: i.cantidad, costo: i.costo }))
@@ -1353,7 +1364,7 @@ async function rechazarPedido() {
         }
         showToast('Actualizando registro central...');
         await callGAS('updatePedidoStatus', {
-            folio: p.folio, estado: 'rechazado',
+            folio: gasNormFolio(p.folio), estado: 'rechazado',
             autorizador: nombreAut, observaciones: obs, fechaDecision
         });
         hideToast();
