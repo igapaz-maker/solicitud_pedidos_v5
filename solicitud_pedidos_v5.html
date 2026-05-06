@@ -637,7 +637,13 @@ function loadConfig() {
     const raw = localStorage.getItem('configV5');
     if (raw) cfg = JSON.parse(raw);
     applyConfigUI();
-    if (cfg.gasUrl) silentPing();
+    if (cfg.gasUrl) {
+        silentPing();
+    } else {
+        // Primera vez sin configurar: llevar al usuario directo a Config
+        setTimeout(() => showTab('tab-config'), 100);
+        setBackendUI(false, 'Pega aquí la URL del Apps Script para comenzar');
+    }
 }
 
 function applyConfigUI() {
@@ -674,11 +680,18 @@ function saveConfig() {
         nombreAut2:    document.getElementById('cfgNombreAut2').value.trim(),
         sheetUrl:      document.getElementById('cfgSheetUrl').value.trim()
     };
-    if (!cfg.gasUrl) { alert("⚠️ La URL del Backend es obligatoria."); return; }
     localStorage.setItem('configV5', JSON.stringify(cfg));
     applyConfigUI();
-    alert("✅ Configuración guardada.\n\nRecuerda probar la conexión con el botón 🧪.");
-    silentPing();
+    let warns = [];
+    if (!cfg.gasUrl) warns.push('• La URL del Backend aún no está configurada.');
+    else if (!cfg.gasUrl.endsWith('/exec')) warns.push('• La URL del Backend no termina en /exec — puede ser incorrecta.');
+    if (!cfg.emailAut1 || !cfg.emailAut2) warns.push('• Faltan los emails de los 2 autorizadores.');
+    if (!cfg.emailBodega) warns.push('• Falta el email de Bodega Central.');
+    const warnTxt = warns.length ? '\n\n⚠️ Pendiente:\n' + warns.join('\n') : '';
+    showToast('✅ Configuración guardada');
+    setTimeout(hideToast, 2000);
+    if (warnTxt) alert('✅ Guardado.' + warnTxt);
+    if (cfg.gasUrl) silentPing();
 }
 
 async function silentPing() {
@@ -686,6 +699,7 @@ async function silentPing() {
     try {
         const j = await callGAS('ping');
         setBackendUI(true, `Sheet: ${j.sheet}`);
+        autoCheckServerInventory(); // solo verificar inventario si hay conexión confirmada
     } catch(e) {
         setBackendUI(false, e.message);
     }
@@ -788,8 +802,28 @@ function enableSearch(on) { ['searchInput','qtyInput'].forEach(id=>document.getE
 function updateDBPanel(meta) {
     document.getElementById('dbProductCount').innerText = meta.count||inventoryData.length;
     document.getElementById('dbVersion').innerText = meta.version||'—';
-    document.getElementById('dbLastUpdate').innerText = (meta.source==='url'?'Google Sheets — ':'Manual — ')+(meta.version||'');
+    const srcLabel = meta.source === 'url' ? 'Google Sheets — ' : meta.source === 'server' || meta.source === 'server-pull' || meta.source === 'upload-server' ? 'Servidor — ' : 'Manual — ';
+    document.getElementById('dbLastUpdate').innerText = srcLabel + (meta.version||'');
     setP('dbStatusPill','ok',`✅ Base activa (${meta.count||inventoryData.length} productos)`);
+}
+
+function applyInventoryFromProducts(products, source) {
+    inventoryData = products;
+    const dl = document.getElementById('productList');
+    dl.innerHTML = '';
+    products.forEach(p => { const o = document.createElement('option'); o.value = p.nombre; dl.appendChild(o); });
+    enableSearch(true);
+    const meta = {
+        timestamp: new Date().toISOString(),
+        source: source || 'server',
+        count: products.length,
+        version: new Date().toLocaleDateString('es-CL') + ' ' + new Date().toLocaleTimeString('es-CL')
+    };
+    localStorage.setItem('inventoryData', JSON.stringify(products));
+    localStorage.setItem('inventoryMeta', JSON.stringify(meta));
+    updateDBPanel(meta);
+    setP('dbMiniStatus', 'ok', `✅ ${products.length} productos`);
+    document.getElementById('btnEnviarAut').disabled = !backendOnline;
 }
 
 (function initDB() {
@@ -842,6 +876,39 @@ document.getElementById('csvFileInput').addEventListener('change', function(e) {
     const f = e.target.files[0]; if (!f) return;
     setP('loadStatus','warn','⏳ Procesando...');
     const r = new FileReader(); r.onload = ev => parseCSV(ev.target.result, 'manual'); r.readAsText(f, 'UTF-8');
+});
+
+document.getElementById('invUploadInput').addEventListener('change', function(e) {
+    const f = e.target.files[0]; if (!f) return;
+    const status = document.getElementById('invUploadStatus');
+    status.innerText = '⏳ Leyendo archivo...';
+    status.style.color = 'var(--muted)';
+    const reader = new FileReader();
+    if (f.name.toLowerCase().endsWith('.csv')) {
+        reader.onload = ev => {
+            const text = ev.target.result;
+            const lines = text.split(/\r?\n/).filter(l => l.trim());
+            const delim = lines[0] && lines[0].includes(';') ? ';' : ',';
+            const regex = new RegExp(`${delim}(?=(?:(?:[^"]*"){2})*[^"]*$)`);
+            const rows = lines.map(l => l.split(regex).map(c => c.replace(/^"|"$/g, '')));
+            showColumnMappingModal(rows, f.name);
+        };
+        reader.readAsText(f, 'UTF-8');
+    } else {
+        reader.onload = ev => {
+            try {
+                const wb = XLSX.read(ev.target.result, { type: 'array' });
+                const ws = wb.Sheets[wb.SheetNames[0]];
+                const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+                showColumnMappingModal(rows, f.name);
+            } catch(err) {
+                status.innerText = '❌ No se pudo leer el archivo: ' + err.message;
+                status.style.color = 'var(--red)';
+            }
+        };
+        reader.readAsArrayBuffer(f);
+    }
+    this.value = '';
 });
 
 // ═══════════════════════════════════════════════════════════════
@@ -1174,8 +1241,8 @@ function recalcAut() {
 
 function removeAutItem(id) {
     if (!pedidoActualAut) return;
+    if (pedidoActualAut.items.length <= 1) { alert("⚠️ No puedes quitar todos los productos. Mejor RECHAZA el pedido."); return; }
     pedidoActualAut.items = pedidoActualAut.items.filter(i => String(i._id) !== id);
-    if (!pedidoActualAut.items.length) { alert("⚠️ No puedes quitar todos los productos. Mejor RECHAZA el pedido."); return; }
     renderAutPanel();
 }
 
@@ -1531,8 +1598,9 @@ async function confirmMappingAndUpload() {
     // Guardar mapeo para próxima vez
     localStorage.setItem('lastColumnMapping', JSON.stringify({ codigo: cIdx, nombre: nIdx, unidad: uIdx, costo: pIdx }));
 
+    const filename = pendingFilename; // capturar antes de que closeMapping lo anule
     closeMapping();
-    await uploadProductsToBackend(products, pendingFilename);
+    await uploadProductsToBackend(products, filename);
 }
 
 async function uploadProductsToBackend(products, filename) {
@@ -1624,8 +1692,7 @@ async function autoCheckServerInventory() {
 // INIT
 // ═══════════════════════════════════════════════════════════════
 onAreaChange();
-loadConfig();
-setTimeout(() => { if (backendOnline) autoCheckServerInventory(); }, 3500);
+loadConfig(); // silentPing → autoCheckServerInventory se encadena dentro si hay conexión
 
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
